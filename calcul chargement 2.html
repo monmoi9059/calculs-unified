@@ -16,12 +16,12 @@
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: #f0f4f8; color: var(--text); }
         header { background: linear-gradient(to right, var(--secondary), var(--primary)); color: var(--light-text); padding: 1rem; text-align: center; }
         .container { max-width: 800px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        
+
         .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
         .tab-btn { flex: 1; padding: 15px; border: none; background: none; cursor: pointer; font-size: 16px; font-weight: bold; color: #666; transition: 0.3s; }
         .tab-btn:hover { background-color: var(--accent); }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
-        
+
         .tab-content { display: none; animation: fadeEffect 0.5s; }
         .tab-content.active { display: block; }
         @keyframes fadeEffect { from {opacity: 0;} to {opacity: 1;} }
@@ -29,7 +29,7 @@
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: 600; }
         input, select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
-        
+
         /* Style spécial pour la section estimation */
         .estimation-box {
             background-color: #fff3e0;
@@ -49,6 +49,13 @@
         .result-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 1.1em; }
         .section-title { color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .warning { font-size: 0.8em; color: #999; text-align: center; margin-top: 30px; font-style: italic; }
+
+        /* Style pour Multi-Simultané */
+        .multi-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; background: #fff; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .multi-row input { flex: 1; margin: 0; }
+        .multi-row .remove-btn { background: #e53935; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .winner { color: #2e7d32; font-weight: bold; }
+        .loser { color: #c62828; }
     </style>
 </head>
 <body>
@@ -65,11 +72,12 @@
         <button class="tab-btn" onclick="openTab(event, 'loading')">Chargement</button>
         <button class="tab-btn" onclick="openTab(event, 'unloading')">Déchargement</button>
         <button class="tab-btn" onclick="openTab(event, 'estimation')">Estimation Rapide</button>
+        <button class="tab-btn" onclick="openTab(event, 'multi')">Multi-Simultané</button>
     </div>
 
     <div id="config" class="tab-content active">
         <h2 class="section-title">Paramètres du Navire</h2>
-        
+
         <div class="form-group">
             <label>DWT (Deadweight - Tonnes Métriques) :</label>
             <input type="number" id="shipDwt" placeholder="Ex: 50000">
@@ -110,12 +118,12 @@
             <label>Hauteur totale des tanks (Mètres) :</label>
             <input type="number" id="tankHeight" placeholder="Calculé ou manuel...">
         </div>
-        
+
         <div class="form-group">
             <label>Nombre de compartiments (Tanks) :</label>
             <input type="number" id="numTanks" placeholder="Ex: 10">
         </div>
-        
+
         <button class="action-btn" onclick="saveConfig()">Sauvegarder Configuration</button>
         <div id="configMsg" class="result-box" style="background-color: #dff0d8; border-color: #3c763d; color: #3c763d; text-align: center;">
             Configuration sauvegardée !
@@ -209,6 +217,20 @@
             </div>
         </div>
     </div>
+
+    <div id="multi" class="tab-content">
+        <h2 class="section-title">Comparaison Multi-Produits</h2>
+        <p style="font-size: 0.9em; margin-bottom: 10px;">Ajoutez des lignes pour comparer plusieurs chargements simultanés.</p>
+
+        <div id="multiContainer"></div>
+
+        <button class="calc-btn" onclick="addMultiLine()" style="margin-bottom: 15px;">+ Ajouter une ligne</button>
+        <button class="action-btn" onclick="calculateMulti()">Calculer et Comparer</button>
+
+        <div id="resultMulti" class="result-box">
+            <div id="multiList"></div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -254,13 +276,13 @@
 
         // 3. Calcul de la Hauteur théorique
         // Formule : Hauteur = Volume / (Surface * Coefficient de Remplissage)
-        // On utilise un coefficient de 0.85 (Block Coefficient moyen pour tankers) 
+        // On utilise un coefficient de 0.85 (Block Coefficient moyen pour tankers)
         // car le navire n'est pas une boîte carrée parfaite.
         let estimatedHeight = totalVolume / (area * 0.85);
 
         // Mise à jour du champ
         document.getElementById('tankHeight').value = estimatedHeight.toFixed(2);
-        
+
         alert("Hauteur estimée à " + estimatedHeight.toFixed(2) + " mètres (basée sur un coefficient de coque de 0.85).");
     }
 
@@ -269,7 +291,7 @@
         tanks = parseFloat(document.getElementById('numTanks').value) || 0;
         height = parseFloat(document.getElementById('tankHeight').value) || 0;
         density = parseFloat(document.getElementById('density').value) || 1.025;
-        
+
         document.getElementById('configMsg').style.display = 'block';
         setTimeout(() => { document.getElementById('configMsg').style.display = 'none'; }, 2000);
     }
@@ -304,6 +326,7 @@
         let timeHours = remaining / rate;
         let h = Math.floor(timeHours);
         let m = Math.round((timeHours - h) * 60);
+        if (m === 60) { h++; m = 0; }
 
         document.getElementById('loadRemaining').innerText = remaining.toFixed(1);
         document.getElementById('loadPercent').innerText = percent.toFixed(1);
@@ -318,9 +341,10 @@
         if (rate === 0) return;
 
         let done = start - current;
-        let timeHours = current / rate; 
+        let timeHours = current / rate;
         let h = Math.floor(timeHours);
         let m = Math.round((timeHours - h) * 60);
+        if (m === 60) { h++; m = 0; }
 
         document.getElementById('unloadDone').innerText = done.toFixed(1);
         document.getElementById('unloadRemaining').innerText = current.toFixed(1);
@@ -336,9 +360,109 @@
         let timeHours = vol / rate;
         let h = Math.floor(timeHours);
         let m = Math.round((timeHours - h) * 60);
+        if (m === 60) { h++; m = 0; }
 
-        document.getElementById('estTime').innerText = h + "h " + m + "m";
+        let eta = getEta(timeHours);
+        document.getElementById('estTime').innerText = h + "h " + m + "m (Fin : " + eta + ")";
         document.getElementById('resultEst').style.display = 'block';
+    }
+
+    // --- NOUVEAU : Calcul Multi-Simultané ---
+
+    // Add one line on start
+    window.addEventListener('load', function() {
+        addMultiLine();
+    });
+
+    function addMultiLine() {
+        const container = document.getElementById('multiContainer');
+        const div = document.createElement('div');
+        div.className = 'multi-row';
+        div.innerHTML = `
+            <input type="text" placeholder="Nom (Ex: Tank 1)" class="m-name">
+            <input type="number" placeholder="Volume (m³)" class="m-vol">
+            <input type="number" placeholder="Taux (m³/h)" class="m-rate">
+            <button class="remove-btn" onclick="this.parentElement.remove()">X</button>
+        `;
+        container.appendChild(div);
+    }
+
+    // --- Helper pour calculer l'ETA (Heure de Fin) ---
+    function getEta(hoursToAdd) {
+        let now = new Date();
+        // Convert hours to milliseconds: hours * 60 * 60 * 1000
+        let msToAdd = hoursToAdd * 60 * 60 * 1000;
+        let future = new Date(now.getTime() + msToAdd);
+
+        // Format: JJ/MM HH:mm
+        let day = String(future.getDate()).padStart(2, '0');
+        let month = String(future.getMonth() + 1).padStart(2, '0');
+        let h = String(future.getHours()).padStart(2, '0');
+        let m = String(future.getMinutes()).padStart(2, '0');
+
+        return `${day}/${month} à ${h}:${m}`;
+    }
+
+    function calculateMulti() {
+        const rows = document.querySelectorAll('.multi-row');
+        let results = [];
+
+        rows.forEach(row => {
+            const name = row.querySelector('.m-name').value || "Inconnu";
+            const vol = parseFloat(row.querySelector('.m-vol').value) || 0;
+            const rate = parseFloat(row.querySelector('.m-rate').value) || 0;
+
+            if (rate > 0 && vol > 0) {
+                let timeHours = vol / rate;
+                results.push({ name: name, vol: vol, rate: rate, time: timeHours });
+            }
+        });
+
+        if (results.length === 0) {
+            alert("Veuillez entrer des volumes et des taux valides.");
+            return;
+        }
+
+        // Sort by time (asc) -> First to finish is first
+        results.sort((a, b) => a.time - b.time);
+
+        const list = document.getElementById('multiList');
+        list.innerHTML = "";
+
+        results.forEach((res, index) => {
+            let h = Math.floor(res.time);
+            let m = Math.round((res.time - h) * 60);
+            if (m === 60) { h++; m = 0; }
+
+            let eta = getEta(res.time);
+            let timeStr = h + "h " + m + "m (Fin : " + eta + ")";
+
+            let extraClass = "";
+            let extraText = "";
+
+            if (index === 0) {
+                extraClass = "winner";
+                extraText = " (PREMIER)";
+            } else if (index === results.length - 1 && results.length > 1) {
+                extraClass = "loser";
+                extraText = " (DERNIER)";
+            }
+
+            const item = document.createElement('div');
+            item.className = `result-item ${extraClass}`;
+
+            const strong = document.createElement('strong');
+            strong.textContent = res.name + " : ";
+
+            const span = document.createElement('span');
+            span.textContent = timeStr + extraText;
+
+            item.appendChild(strong);
+            item.appendChild(span);
+            list.appendChild(item);
+        });
+
+        document.getElementById('resultMulti').style.display = 'block';
     }
 </script>
 
