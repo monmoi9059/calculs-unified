@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculateur Maritime Complet</title>
+    <style>
+        :root {
+            --primary: #006064;
+            --secondary: #00363a;
+            --accent: #e0f7fa;
+            --text: #333;
+            --light-text: #fff;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: #f0f4f8; color: var(--text); }
+        header { background: linear-gradient(to right, var(--secondary), var(--primary)); color: var(--light-text); padding: 1rem; text-align: center; }
+        .container { max-width: 800px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; cursor: pointer; font-size: 16px; font-weight: bold; color: #666; transition: 0.3s; }
+        .tab-btn:hover { background-color: var(--accent); }
+        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+        
+        .tab-content { display: none; animation: fadeEffect 0.5s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeEffect { from {opacity: 0;} to {opacity: 1;} }
+
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
+        
+        /* Style spécial pour la section estimation */
+        .estimation-box {
+            background-color: #fff3e0;
+            border: 1px solid #ffe0b2;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .estimation-box h3 { margin-top: 0; color: #e65100; font-size: 1em; }
+
+        button.action-btn { background-color: var(--primary); color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 18px; margin-top: 10px; font-weight: bold; }
+        button.action-btn:hover { background-color: var(--secondary); }
+        button.calc-btn { background-color: #e65100; color: white; padding: 8px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; }
+        button.calc-btn:hover { background-color: #bf360c; }
+
+        .result-box { margin-top: 20px; padding: 20px; background-color: var(--accent); border-radius: 4px; border-left: 6px solid var(--primary); display: none; }
+        .result-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 1.1em; }
+        .section-title { color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        .warning { font-size: 0.8em; color: #999; text-align: center; margin-top: 30px; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Calculateur Maritime</h1>
+    <p>Estimation Hauteur & Volumes</p>
+</header>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab(event, 'config')">Configuration</button>
+        <button class="tab-btn" onclick="openTab(event, 'calc1m')">Calcul 1m (m³)</button>
+        <button class="tab-btn" onclick="openTab(event, 'loading')">Chargement</button>
+        <button class="tab-btn" onclick="openTab(event, 'unloading')">Déchargement</button>
+    </div>
+
+    <div id="config" class="tab-content active">
+        <h2 class="section-title">Paramètres du Navire</h2>
+        
+        <div class="form-group">
+            <label>DWT (Deadweight - Tonnes Métriques) :</label>
+            <input type="number" id="shipDwt" placeholder="Ex: 50000">
+        </div>
+
+        <div class="form-group">
+            <label>Type de Produit :</label>
+            <select id="productSelect" onchange="updateDensityFromSelect()">
+                <option value="custom">-- Choisir ou entrer manuellement --</option>
+                <option value="0.740">Essence (Gasoline) - SG 0.740</option>
+                <option value="0.850">Diesel (MDO/MGO) - SG 0.850</option>
+                <option value="0.980">HFO (Fioul Lourd) - SG 0.980</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Densité (SG) :</label>
+            <input type="number" id="density" value="1.025" step="0.001">
+        </div>
+
+        <div class="estimation-box">
+            <h3>Calculateur de Hauteur (Optionnel)</h3>
+            <p style="font-size:0.9em; margin-bottom:10px;">Si tu ne connais pas la hauteur des tanks, entre les dimensions du navire ci-dessous pour l'estimer à partir du DWT.</p>
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                    <label>Longueur (LOA) m :</label>
+                    <input type="number" id="shipLength" placeholder="Long.">
+                </div>
+                <div style="flex:1;">
+                    <label>Largeur (Beam) m :</label>
+                    <input type="number" id="shipBeam" placeholder="Larg.">
+                </div>
+            </div>
+            <button class="calc-btn" onclick="estimateHeightFromDwt()">Estimer la Hauteur</button>
+        </div>
+
+        <div class="form-group">
+            <label>Hauteur totale des tanks (Mètres) :</label>
+            <input type="number" id="tankHeight" placeholder="Calculé ou manuel...">
+        </div>
+        
+        <div class="form-group">
+            <label>Nombre de compartiments (Tanks) :</label>
+            <input type="number" id="numTanks" placeholder="Ex: 10">
+        </div>
+        
+        <button class="action-btn" onclick="saveConfig()">Sauvegarder Configuration</button>
+        <div id="configMsg" class="result-box" style="background-color: #dff0d8; border-color: #3c763d; color: #3c763d; text-align: center;">
+            Configuration sauvegardée !
+        </div>
+    </div>
+
+    <div id="calc1m" class="tab-content">
+        <h2 class="section-title">Volume requis pour 1m de niveau</h2>
+        <button class="action-btn" onclick="calculateOneMeter()">Calculer le Volume pour 1m</button>
+
+        <div id="result1m" class="result-box">
+            <div class="result-item"><strong>Volume Total Navire :</strong> <span><span id="totalVol">0</span> m³</span></div>
+            <div class="result-item"><strong>Hauteur utilisée :</strong> <span><span id="usedHeight">0</span> m</span></div>
+            <hr>
+            <div class="result-item" style="color: #006064; font-weight: bold; font-size: 1.2em;">
+                Volume pour 1m (1 tank) : <span id="volOneTank1m">0</span> m³
+            </div>
+            <div class="result-item">
+                Volume pour 1m (Navire complet) : <span id="volAllTanks1m">0</span> m³
+            </div>
+        </div>
+    </div>
+
+    <div id="loading" class="tab-content">
+        <h2 class="section-title">Chargement (m³)</h2>
+        <div class="form-group">
+            <label>Volume Total à Charger (m³) :</label>
+            <input type="number" id="loadTarget">
+        </div>
+        <div class="form-group">
+            <label>Volume Actuel à Bord (m³) :</label>
+            <input type="number" id="loadCurrent">
+        </div>
+        <div class="form-group">
+            <label>Taux de Chargement (m³/h) :</label>
+            <input type="number" id="loadRate">
+        </div>
+        <button class="action-btn" onclick="calculateLoading()">Calculer Chargement</button>
+
+        <div id="resultLoad" class="result-box">
+            <div class="result-item"><strong>Reste à charger :</strong> <span><span id="loadRemaining">0</span> m³</span></div>
+            <div class="result-item"><strong>Pourcentage :</strong> <span id="loadPercent">0</span> %</div>
+            <hr>
+            <div class="result-item" style="font-size: 1.3em; font-weight: bold;">
+                Temps restant : <span id="loadTime">0h 00m</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="unloading" class="tab-content">
+        <h2 class="section-title">Déchargement (m³)</h2>
+        <div class="form-group">
+            <label>Volume Initial (m³) :</label>
+            <input type="number" id="unloadStart">
+        </div>
+        <div class="form-group">
+            <label>Volume Restant (m³) :</label>
+            <input type="number" id="unloadCurrent">
+        </div>
+        <div class="form-group">
+            <label>Taux de Pompage (m³/h) :</label>
+            <input type="number" id="unloadRate">
+        </div>
+        <button class="action-btn" onclick="calculateUnloading()">Calculer Déchargement</button>
+
+        <div id="resultUnload" class="result-box">
+            <div class="result-item"><strong>Volume Déchargé :</strong> <span><span id="unloadDone">0</span> m³</span></div>
+            <div class="result-item"><strong>Reste à pomper :</strong> <span><span id="unloadRemaining">0</span> m³</span></div>
+            <hr>
+            <div class="result-item" style="font-size: 1.3em; font-weight: bold;">
+                Temps restant : <span id="unloadTime">0h 00m</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variables
+    let dwt = 0;
+    let tanks = 0;
+    let height = 0;
+    let density = 1.025;
+
+    function updateDensityFromSelect() {
+        const sel = document.getElementById("productSelect").value;
+        if (sel !== "custom") document.getElementById("density").value = sel;
+    }
+
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) { tabcontent[i].style.display = "none"; tabcontent[i].classList.remove("active"); }
+        tablinks = document.getElementsByClassName("tab-btn");
+        for (i = 0; i < tablinks.length; i++) { tablinks[i].className = tablinks[i].className.replace(" active", ""); }
+        document.getElementById(tabName).style.display = "block";
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.className += " active";
+    }
+
+    // --- NOUVELLE FONCTION : Estimation de la hauteur ---
+    function estimateHeightFromDwt() {
+        let d = parseFloat(document.getElementById('shipDwt').value) || 0;
+        let den = parseFloat(document.getElementById('density').value) || 1.025;
+        let l = parseFloat(document.getElementById('shipLength').value) || 0;
+        let w = parseFloat(document.getElementById('shipBeam').value) || 0;
+
+        if (d === 0 || l === 0 || w === 0) {
+            alert("Pour estimer la hauteur, il faut : DWT, Longueur et Largeur.");
+            return;
+        }
+
+        // 1. Calcul du Volume Total requis pour ce DWT
+        let totalVolume = d / den;
+
+        // 2. Calcul de la surface du pont (Aire)
+        let area = l * w;
+
+        // 3. Calcul de la Hauteur théorique
+        // Formule : Hauteur = Volume / (Surface * Coefficient de Remplissage)
+        // On utilise un coefficient de 0.85 (Block Coefficient moyen pour tankers) 
+        // car le navire n'est pas une boîte carrée parfaite.
+        let estimatedHeight = totalVolume / (area * 0.85);
+
+        // Mise à jour du champ
+        document.getElementById('tankHeight').value = estimatedHeight.toFixed(2);
+        
+        alert("Hauteur estimée à " + estimatedHeight.toFixed(2) + " mètres (basée sur un coefficient de coque de 0.85).");
+    }
+
+    function saveConfig() {
+        dwt = parseFloat(document.getElementById('shipDwt').value) || 0;
+        tanks = parseFloat(document.getElementById('numTanks').value) || 0;
+        height = parseFloat(document.getElementById('tankHeight').value) || 0;
+        density = parseFloat(document.getElementById('density').value) || 1.025;
+        
+        document.getElementById('configMsg').style.display = 'block';
+        setTimeout(() => { document.getElementById('configMsg').style.display = 'none'; }, 2000);
+    }
+
+    function calculateOneMeter() {
+        saveConfig(); // S'assurer que les variables sont à jour
+        if (dwt === 0 || tanks === 0 || height === 0) {
+            alert("Config incomplète (DWT, Tanks ou Hauteur manquants).");
+            return;
+        }
+
+        let totalVolumeCapacity = dwt / density;
+        let volumePerTank = totalVolumeCapacity / tanks;
+        let volumePerMeter = volumePerTank / height;
+
+        document.getElementById('totalVol').innerText = totalVolumeCapacity.toFixed(1);
+        document.getElementById('usedHeight').innerText = height.toFixed(2);
+        document.getElementById('volOneTank1m').innerText = volumePerMeter.toFixed(2);
+        document.getElementById('volAllTanks1m').innerText = (volumePerMeter * tanks).toFixed(2);
+
+        document.getElementById('result1m').style.display = 'block';
+    }
+
+    function calculateLoading() {
+        let target = parseFloat(document.getElementById('loadTarget').value) || 0;
+        let current = parseFloat(document.getElementById('loadCurrent').value) || 0;
+        let rate = parseFloat(document.getElementById('loadRate').value) || 0;
+        if (rate === 0) return;
+
+        let remaining = target - current;
+        let percent = (current / target) * 100;
+        let timeHours = remaining / rate;
+        let h = Math.floor(timeHours);
+        let m = Math.round((timeHours - h) * 60);
+
+        document.getElementById('loadRemaining').innerText = remaining.toFixed(1);
+        document.getElementById('loadPercent').innerText = percent.toFixed(1);
+        document.getElementById('loadTime').innerText = h + "h " + m + "m";
+        document.getElementById('resultLoad').style.display = 'block';
+    }
+
+    function calculateUnloading() {
+        let start = parseFloat(document.getElementById('unloadStart').value) || 0;
+        let current = parseFloat(document.getElementById('unloadCurrent').value) || 0;
+        let rate = parseFloat(document.getElementById('unloadRate').value) || 0;
+        if (rate === 0) return;
+
+        let done = start - current;
+        let timeHours = current / rate; 
+        let h = Math.floor(timeHours);
+        let m = Math.round((timeHours - h) * 60);
+
+        document.getElementById('unloadDone').innerText = done.toFixed(1);
+        document.getElementById('unloadRemaining').innerText = current.toFixed(1);
+        document.getElementById('unloadTime').innerText = h + "h " + m + "m";
+        document.getElementById('resultUnload').style.display = 'block';
+    }
+</script>
+
+</body>
+</html>
