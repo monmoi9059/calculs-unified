@@ -144,17 +144,14 @@
             <label>Date/Heure de début (Optionnel - Par défaut : Maintenant) :</label>
             <input type="datetime-local" id="loadStartTime">
         </div>
-        <div class="form-group">
-            <label>Volume Total à Charger (m³) :</label>
-            <input type="number" id="loadTarget">
-        </div>
-        <div class="form-group">
-            <label>Volume Actuel à Bord (m³) :</label>
-            <input type="number" id="loadCurrent">
-        </div>
-        <div class="form-group">
-            <label>Taux de Chargement (m³/h) :</label>
-            <input type="number" id="loadRate">
+
+        <div class="form-group" style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #e0f7fa;">
+            <label>Séquence de Chargement (Produits) :</label>
+            <div id="loadingProductsContainer"></div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="calc-btn" onclick="addLoadingProduct()" style="flex:1; background-color:#0097a7;">+ Ajouter Produit</button>
+                <button class="calc-btn" onclick="resetLoadingProducts()" style="flex:1; background-color:#757575;">Réinitialiser</button>
+            </div>
         </div>
 
         <div class="form-group" style="background: #e3f2fd; padding: 10px; border-radius: 4px; border: 1px solid #bbdefb;">
@@ -312,18 +309,71 @@
         document.getElementById('loadShiftDetails').style.display = enabled ? 'block' : 'none';
     }
 
+    // --- Loading Multiple Products Logic ---
+    let loadProdCount = 0;
+    function addLoadingProduct() {
+        loadProdCount++;
+        const div = document.createElement('div');
+        div.className = 'load-prod-row';
+        div.style.display = 'flex';
+        div.style.flexDirection = 'column'; // Stack on mobile, but let's try row on desktop
+        div.style.gap = '5px';
+        div.style.marginBottom = '10px';
+        div.style.padding = '8px';
+        div.style.borderBottom = '1px dashed #ccc';
+        div.innerHTML = `
+            <input type="text" placeholder="Nom du Produit (Ex: Prod A)" class="load-prod-name" style="width:100%; margin-bottom:5px;">
+            <div style="display:flex; gap:5px;">
+                <input type="number" placeholder="Total (m³)" class="load-prod-target" style="flex:1;">
+                <input type="number" placeholder="À bord (m³)" class="load-prod-current" style="flex:1;">
+                <input type="number" placeholder="Taux (m³/h)" class="load-prod-rate" style="flex:1;">
+            </div>
+        `;
+        document.getElementById('loadingProductsContainer').appendChild(div);
+    }
+
+    function resetLoadingProducts() {
+        document.getElementById('loadingProductsContainer').innerHTML = '';
+        loadProdCount = 0;
+        addLoadingProduct();
+    }
+
     function calculateLoading() {
-        let target = parseFloat(document.getElementById('loadTarget').value) || 0;
-        let current = parseFloat(document.getElementById('loadCurrent').value) || 0;
-        let rate = parseFloat(document.getElementById('loadRate').value) || 0;
-        if (rate === 0) return;
+        let totalTarget = 0;
+        let totalCurrent = 0;
+        let totalRemaining = 0;
+        let totalTimeHours = 0;
 
-        let remaining = target - current;
-        let percent = (current / target) * 100;
+        // Iterate Products to calc basics
+        const rows = document.querySelectorAll('.load-prod-row');
+        let productData = [];
 
-        let timeHours = remaining / rate;
+        rows.forEach(row => {
+            let name = row.querySelector('.load-prod-name').value || "Produit";
+            let t = parseFloat(row.querySelector('.load-prod-target').value) || 0;
+            let c = parseFloat(row.querySelector('.load-prod-current').value) || 0;
+            let r = parseFloat(row.querySelector('.load-prod-rate').value) || 0;
 
-        // --- Shift Logic ---
+            let rem = t - c;
+            if (rem < 0) rem = 0;
+
+            totalTarget += t;
+            totalCurrent += c;
+            totalRemaining += rem;
+
+            let duration = (r > 0) ? (rem / r) : 0;
+            totalTimeHours += duration;
+
+            if (rem > 0) {
+                productData.push({name: name, remaining: rem, rate: r, duration: duration});
+            }
+        });
+
+        if (totalTarget === 0 && totalTimeHours === 0) return; // Nothing entered
+
+        let percent = (totalTarget > 0) ? (totalCurrent / totalTarget) * 100 : 0;
+
+        // --- Shift Logic (Global) ---
         let shiftEnabled = document.getElementById('loadShiftEnabled').checked;
         let shiftMsg = "";
 
@@ -334,32 +384,48 @@
             let shiftTrigger = parseFloat(document.getElementById('loadShiftRemaining').value) || 0;
             let shiftDurationMins = parseFloat(document.getElementById('loadShiftDuration').value) || 0;
 
-            // "Quantité restant à charger" = remaining to be loaded.
-            // Stop point is when (Target - Loaded) == shiftTrigger.
-            // Current remaining = target - current.
-            // So volume to handle before stop = currentRemaining - shiftTrigger.
+            // "Stop when X amount remains globally"
+            // We need to find WHEN this happens in the sequence.
 
-            let volBeforeStop = remaining - shiftTrigger;
+            let volBeforeStop = totalRemaining - shiftTrigger;
 
             if (volBeforeStop > 0) {
-                 let timeToStop = volBeforeStop / rate; // hours
+                 // Calculate time to reach volBeforeStop by walking the product sequence
+                 let tempVol = 0;
+                 let timeToStop = 0;
+
+                 for (let p of productData) {
+                     let needed = volBeforeStop - tempVol;
+                     if (needed <= 0) break;
+
+                     if (p.remaining <= needed) {
+                         // Finish this product completely before stop
+                         tempVol += p.remaining;
+                         timeToStop += p.duration;
+                     } else {
+                         // Stop happens inside this product
+                         let partialVol = needed;
+                         if (p.rate > 0) timeToStop += (partialVol / p.rate);
+                         tempVol += partialVol;
+                         break;
+                     }
+                 }
+
                  let stopDate = addMinutes(now, timeToStop * 60);
                  shiftMsg = `<div class="result-item" style="color: #e65100;"><strong>Arrêt prévu à :</strong> <span>${formatDateTime(stopDate)}</span></div>`;
 
-                 // Add delay
-                 timeHours += (shiftDurationMins / 60);
-
-                 // Add info about delay duration in text?
+                 // Add delay to total
+                 totalTimeHours += (shiftDurationMins / 60);
                  shiftMsg += `<div class="result-item" style="font-size:0.9em; color:#666;">(+ ${shiftDurationMins} min de délai)</div>`;
             }
         }
 
-        let h = Math.floor(timeHours);
-        let m = Math.round((timeHours - h) * 60);
+        let h = Math.floor(totalTimeHours);
+        let m = Math.round((totalTimeHours - h) * 60);
 
-        let endDate = addMinutes(now, timeHours * 60);
+        let endDate = addMinutes(now, totalTimeHours * 60);
 
-        document.getElementById('loadRemaining').innerText = remaining.toFixed(1);
+        document.getElementById('loadRemaining').innerText = totalRemaining.toFixed(1);
         document.getElementById('loadPercent').innerText = percent.toFixed(1);
         document.getElementById('loadTime').innerText = h + "h " + m + "m";
         document.getElementById('resultLoad').style.display = 'block';
@@ -517,6 +583,7 @@
 
     // Init
     addShoreTank();
+    addLoadingProduct();
 </script>
 
 </body>
