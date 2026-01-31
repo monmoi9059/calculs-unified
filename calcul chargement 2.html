@@ -371,6 +371,7 @@
         div.innerHTML = `
             <input type="text" placeholder="Nom (Ex: Tk 1)" class="tank-name" style="flex:1;">
             <input type="number" placeholder="Qté (m³)" class="tank-qty" style="flex:1;">
+            <input type="number" placeholder="Délai (min)" class="tank-delay" style="flex:0.5;">
         `;
         document.getElementById('shoreTanksContainer').appendChild(div);
     }
@@ -388,51 +389,100 @@
         if (rate === 0) return;
 
         let done = start - current;
-        let timeHours = current / rate;
-        let h = Math.floor(timeHours);
-        let m = Math.round((timeHours - h) * 60);
-
         let now = new Date();
-        let endDate = addMinutes(now, timeHours * 60);
+        let extraHtml = "";
 
-        document.getElementById('unloadDone').innerText = done.toFixed(1);
-        document.getElementById('unloadRemaining').innerText = current.toFixed(1);
-        document.getElementById('unloadTime').innerText = h + "h " + m + "m";
-        document.getElementById('resultUnload').style.display = 'block';
-
-        let extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée (Total) : ${formatDateTime(endDate)}</div>`;
-
-        // Shore Tanks Schedule
+        // Shore Tanks Schedule with Slow Start Logic
         const tankRows = document.querySelectorAll('.shore-tank-row');
         let hasTanks = false;
         tankRows.forEach(row => { if(row.querySelector('.tank-qty').value) hasTanks = true; });
 
+        let totalDurationMins = 0;
+
         if (hasTanks) {
-            extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:#e65100;">Séquence Réservoirs :</h4>`;
-            let cumulativeTime = 0; // minutes
+            extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:#e65100;">Séquence Réservoirs (avec début lent 30 min max 3000 m³/h) :</h4>`;
+
+            // Effective slow rate is min(3000, userRate)
+            let slowRate = Math.min(3000, rate);
+            // Volume moved in 30 mins at slow rate = slowRate * 0.5 hours
+            let volIn30Mins = slowRate * 0.5;
+
+            let totalTankQty = 0;
 
             tankRows.forEach((row, index) => {
                 let name = row.querySelector('.tank-name').value || `Réservoir ${index + 1}`;
                 let qty = parseFloat(row.querySelector('.tank-qty').value) || 0;
+                let delay = parseFloat(row.querySelector('.tank-delay').value) || 0;
 
                 if (qty > 0) {
-                    // Time for this tank
-                    let durationHours = qty / rate;
-                    let durationMins = durationHours * 60;
+                    totalTankQty += qty;
 
-                    cumulativeTime += durationMins;
-                    let tankEndTime = addMinutes(now, cumulativeTime);
+                    // Add User Delay first
+                    totalDurationMins += delay;
+
+                    // Calculate Duration for this tank
+                    let durationHours = 0;
+
+                    if (qty <= volIn30Mins) {
+                        // Tank is small, finishes during slow start phase
+                        durationHours = qty / slowRate;
+                    } else {
+                        // Tank has slow start for 30 mins, then normal rate
+                        let remainingAfter30 = qty - volIn30Mins;
+                        durationHours = 0.5 + (remainingAfter30 / rate);
+                    }
+
+                    let durationMins = durationHours * 60;
+                    totalDurationMins += durationMins;
+
+                    let tankEndTime = addMinutes(now, totalDurationMins);
 
                     extraHtml += `
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em;">
-                            <span>${name} (${qty} m³)</span>
+                            <span>${name} (${qty} m³) ${delay > 0 ? `<i style="font-size:0.8em; color:#666;">(+${delay}m)</i>` : ''}</span>
                             <span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>
                         </div>
                     `;
                 }
             });
+
+            // Check for unassigned remaining volume
+            let unassigned = current - totalTankQty;
+            if (unassigned > 0.01) { // small epsilon
+                 let unassignedHours = unassigned / rate;
+                 let unassignedMins = unassignedHours * 60;
+                 totalDurationMins += unassignedMins;
+                 let finalEndTime = addMinutes(now, totalDurationMins);
+
+                 extraHtml += `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em; color:#666; font-style:italic;">
+                        <span>Reste non assigné (${unassigned.toFixed(1)} m³)</span>
+                        <span>Fin : ${formatDateTime(finalEndTime)}</span>
+                    </div>
+                `;
+            } else if (unassigned < -0.01) {
+                 extraHtml += `<div style="color:red; font-size:0.9em;">Attention: La somme des réservoirs (${totalTankQty} m³) dépasse le reste à pomper !</div>`;
+            }
+
+            let finalDate = addMinutes(now, totalDurationMins);
+            extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée (Ajustée) : ${formatDateTime(finalDate)}</div>` + extraHtml;
             extraHtml += `</div>`;
+
+        } else {
+             // Fallback for simple calculation without tanks list
+             let timeHours = current / rate;
+             totalDurationMins = timeHours * 60;
+             let endDate = addMinutes(now, totalDurationMins);
+             extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée (Simple) : ${formatDateTime(endDate)}</div>`;
         }
+
+        let h = Math.floor(totalDurationMins / 60);
+        let m = Math.round(totalDurationMins % 60);
+
+        document.getElementById('unloadDone').innerText = done.toFixed(1);
+        document.getElementById('unloadRemaining').innerText = current.toFixed(1);
+        document.getElementById('unloadTime').innerText = h + "h " + m + "m";
+        document.getElementById('resultUnload').style.display = 'block';
 
         document.getElementById('unloadExtraInfo').innerHTML = extraHtml;
     }
