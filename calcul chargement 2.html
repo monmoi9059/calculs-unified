@@ -570,14 +570,31 @@
     function addShoreTank() {
         tankCount++;
         const div = document.createElement('div');
-        div.className = 'shore-tank-row';
-        div.style.display = 'flex';
-        div.style.gap = '10px';
-        div.style.marginBottom = '5px';
+        div.className = 'shore-tank-row box-light';
+        div.style.padding = '10px';
+        div.style.marginBottom = '10px';
+        div.style.borderRadius = '4px';
+
         div.innerHTML = `
-            <input type="text" placeholder="Nom (Ex: Tk 1)" class="tank-name" style="flex:1;">
-            <input type="number" placeholder="Qté (m³)" class="tank-qty" style="flex:1;">
-            <input type="number" placeholder="Délai (min)" class="tank-delay" style="flex:0.5;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <input type="text" placeholder="Nom (Ex: Tk 1)" class="tank-name" style="width:85%;">
+                <button onclick="this.parentElement.parentElement.remove()" class="delete-btn">X</button>
+            </div>
+            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <div style="flex:1;"><label style="font-size:0.8em;">Qté (m³)</label><input type="number" class="tank-qty"></div>
+                <div style="flex:1;"><label style="font-size:0.8em;">Délai Avant (min)</label><input type="number" class="tank-delay"></div>
+            </div>
+
+            <div style="border-top:1px dashed #ccc; padding-top:5px; margin-top:5px;">
+                <label style="display:flex; align-items:center; font-size:0.9em; color:var(--orange-btn); cursor:pointer;">
+                    <input type="checkbox" class="tank-slow-toggle" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
+                    Ajouter Ralentissement
+                </label>
+                <div class="tank-slow-inputs box-warning" style="display:none; gap:5px; padding:5px; margin-top:5px; border-radius:3px;">
+                     <div style="flex:1;"><label style="font-size:0.8em;">Débit Restreint (m³/h)</label><input type="number" class="tank-slow-rate" placeholder="Ex: 500"></div>
+                     <div style="flex:1;"><label style="font-size:0.8em;">Durée (min)</label><input type="number" class="tank-slow-dur" placeholder="Ex: 30"></div>
+                </div>
+            </div>
         `;
         document.getElementById('shoreTanksContainer').appendChild(div);
     }
@@ -610,12 +627,7 @@
         let totalDurationMins = 0;
 
         if (hasTanks) {
-            extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:var(--text-est-title);">Séquence Réservoirs (avec début lent 30 min max 3000 m³/h) :</h4>`;
-
-            // Effective slow rate is min(3000, userRate)
-            let slowRate = Math.min(3000, rate);
-            // Volume moved in 30 mins at slow rate = slowRate * 0.5 hours
-            let volIn30Mins = slowRate * 0.5;
+            extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:var(--text-est-title);">Séquence Réservoirs :</h4>`;
 
             let totalTankQty = 0;
 
@@ -624,6 +636,11 @@
                 let qty = parseFloat(row.querySelector('.tank-qty').value) || 0;
                 let delay = parseFloat(row.querySelector('.tank-delay').value) || 0;
 
+                // Slowdown inputs
+                let slowRateInput = parseFloat(row.querySelector('.tank-slow-rate').value) || 0;
+                let slowDurInput = parseFloat(row.querySelector('.tank-slow-dur').value) || 0;
+                let useSlowdown = row.querySelector('.tank-slow-toggle').checked && slowRateInput > 0 && slowDurInput > 0;
+
                 if (qty > 0) {
                     totalTankQty += qty;
 
@@ -631,26 +648,43 @@
                     totalDurationMins += delay;
 
                     // Calculate Duration for this tank
-                    let durationHours = 0;
+                    let tankDurationMins = 0;
+                    let remainingQty = qty;
+                    let slowMsg = "";
 
-                    if (qty <= volIn30Mins) {
-                        // Tank is small, finishes during slow start phase
-                        durationHours = qty / slowRate;
-                    } else {
-                        // Tank has slow start for 30 mins, then normal rate
-                        let remainingAfter30 = qty - volIn30Mins;
-                        durationHours = 0.5 + (remainingAfter30 / rate);
+                    if (useSlowdown) {
+                        let volDuringSlow = slowRateInput * (slowDurInput / 60);
+
+                        // Check if tank finishes during slowdown
+                        if (remainingQty <= volDuringSlow) {
+                            let timeToFinish = (remainingQty / slowRateInput) * 60;
+                            tankDurationMins += timeToFinish;
+                            slowMsg = `<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti : ${timeToFinish.toFixed(1)}m (Fin du tank)</div>`;
+                            remainingQty = 0;
+                        } else {
+                            tankDurationMins += slowDurInput;
+                            remainingQty -= volDuringSlow;
+                            slowMsg = `<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti : ${slowDurInput}m @ ${slowRateInput}m³/h</div>`;
+                        }
                     }
 
-                    let durationMins = durationHours * 60;
-                    totalDurationMins += durationMins;
+                    // Remaining volume at normal rate
+                    if (remainingQty > 0) {
+                        let timeNormal = (remainingQty / rate) * 60;
+                        tankDurationMins += timeNormal;
+                    }
 
+                    totalDurationMins += tankDurationMins;
                     let tankEndTime = addMinutes(now, totalDurationMins);
 
                     extraHtml += `
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em;">
-                            <span>${name} (${qty} m³) ${delay > 0 ? `<i style="font-size:0.8em; color:var(--text); opacity:0.7;">(+${delay}m)</i>` : ''}</span>
-                            <span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>
+                        <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                            <div style="display:flex; justify-content:space-between; font-size:1em;">
+                                <span>${name} (${qty} m³)</span>
+                                <span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>
+                            </div>
+                            ${delay > 0 ? `<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Délai avant : ${delay} min</div>` : ''}
+                            ${slowMsg}
                         </div>
                     `;
                 }
