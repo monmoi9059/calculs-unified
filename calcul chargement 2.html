@@ -54,11 +54,35 @@
         }
 
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: var(--bg-body); color: var(--text); transition: background-color 0.3s, color 0.3s; }
-        header { background: linear-gradient(to right, var(--secondary), var(--primary)); color: var(--light-text); padding: 1rem; text-align: center; position: relative; }
+
+        header { background: linear-gradient(to right, var(--secondary), var(--primary)); color: var(--light-text); padding: 1rem; text-align: center; position: relative; overflow: hidden; }
+        header > * { position: relative; z-index: 1; }
+        header::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url('menu_bg.png');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.3;
+            z-index: 0;
+        }
+
         .container { max-width: 800px; margin: 20px auto; background: var(--bg-container); padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px var(--shadow); transition: background-color 0.3s; }
 
-        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
-        .tab-btn { flex: 1; padding: 15px; border: none; background: none; cursor: pointer; font-size: 16px; font-weight: bold; color: #666; transition: 0.3s; }
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; position: relative; overflow: hidden; border-radius: 4px; }
+        .tabs::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: url('menu_bg.png');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.15; /* Très léger pour ne pas gêner la lecture */
+            z-index: 0;
+        }
+
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; cursor: pointer; font-size: 16px; font-weight: bold; color: #666; transition: 0.3s; position: relative; z-index: 1; }
         .tab-btn:hover { background-color: var(--accent); }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
 
@@ -650,25 +674,42 @@
                     // Calculate Duration for this tank
                     let tankDurationMins = 0;
                     let remainingQty = qty;
-                    let slowMsg = "";
+                    let msgs = [];
 
-                    if (useSlowdown) {
+                    // --- Phase 1: Standard Slow Start (30 min @ Max 3000 m³/h) ---
+                    let startDur = 30;
+                    // Limité à 3000 m³/h, ou le taux normal si inférieur
+                    let startRate = (rate > 3000) ? 3000 : rate;
+                    let startVol = startRate * (startDur / 60);
+
+                    if (remainingQty <= startVol) {
+                        let time = (remainingQty / startRate) * 60;
+                        tankDurationMins += time;
+                        msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage : ${time.toFixed(1)}m (Fin du tank)</div>`);
+                        remainingQty = 0;
+                    } else {
+                        tankDurationMins += startDur;
+                        remainingQty -= startVol;
+                        msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage standard : 30m @ ${startRate.toFixed(0)} m³/h</div>`);
+                    }
+
+                    // --- Phase 2: Manual Slowdown ---
+                    if (remainingQty > 0 && useSlowdown) {
                         let volDuringSlow = slowRateInput * (slowDurInput / 60);
 
-                        // Check if tank finishes during slowdown
                         if (remainingQty <= volDuringSlow) {
-                            let timeToFinish = (remainingQty / slowRateInput) * 60;
-                            tankDurationMins += timeToFinish;
-                            slowMsg = `<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti : ${timeToFinish.toFixed(1)}m (Fin du tank)</div>`;
+                            let time = (remainingQty / slowRateInput) * 60;
+                            tankDurationMins += time;
+                            msgs.push(`<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti Manuel : ${time.toFixed(1)}m (Fin du tank)</div>`);
                             remainingQty = 0;
                         } else {
                             tankDurationMins += slowDurInput;
                             remainingQty -= volDuringSlow;
-                            slowMsg = `<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti : ${slowDurInput}m @ ${slowRateInput}m³/h</div>`;
+                            msgs.push(`<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti Manuel : ${slowDurInput}m @ ${slowRateInput} m³/h</div>`);
                         }
                     }
 
-                    // Remaining volume at normal rate
+                    // --- Phase 3: Normal Rate ---
                     if (remainingQty > 0) {
                         let timeNormal = (remainingQty / rate) * 60;
                         tankDurationMins += timeNormal;
@@ -684,7 +725,7 @@
                                 <span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>
                             </div>
                             ${delay > 0 ? `<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Délai avant : ${delay} min</div>` : ''}
-                            ${slowMsg}
+                            ${msgs.join('')}
                         </div>
                     `;
                 }
