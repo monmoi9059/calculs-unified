@@ -16,12 +16,12 @@
         body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: #f0f4f8; color: var(--text); }
         header { background: linear-gradient(to right, var(--secondary), var(--primary)); color: var(--light-text); padding: 1rem; text-align: center; }
         .container { max-width: 800px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        
+
         .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
         .tab-btn { flex: 1; padding: 15px; border: none; background: none; cursor: pointer; font-size: 16px; font-weight: bold; color: #666; transition: 0.3s; }
         .tab-btn:hover { background-color: var(--accent); }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
-        
+
         .tab-content { display: none; animation: fadeEffect 0.5s; }
         .tab-content.active { display: block; }
         @keyframes fadeEffect { from {opacity: 0;} to {opacity: 1;} }
@@ -29,7 +29,7 @@
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: 600; }
         input, select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
-        
+
         /* Style spécial pour la section estimation */
         .estimation-box {
             background-color: #fff3e0;
@@ -68,7 +68,7 @@
 
     <div id="config" class="tab-content active">
         <h2 class="section-title">Paramètres du Navire</h2>
-        
+
         <div class="form-group">
             <label>DWT (Deadweight - Tonnes Métriques) :</label>
             <input type="number" id="shipDwt" placeholder="Ex: 50000">
@@ -109,12 +109,12 @@
             <label>Hauteur totale des tanks (Mètres) :</label>
             <input type="number" id="tankHeight" placeholder="Calculé ou manuel...">
         </div>
-        
+
         <div class="form-group">
             <label>Nombre de compartiments (Tanks) :</label>
             <input type="number" id="numTanks" placeholder="Ex: 10">
         </div>
-        
+
         <button class="action-btn" onclick="saveConfig()">Sauvegarder Configuration</button>
         <div id="configMsg" class="result-box" style="background-color: #dff0d8; border-color: #3c763d; color: #3c763d; text-align: center;">
             Configuration sauvegardée !
@@ -141,17 +141,19 @@
     <div id="loading" class="tab-content">
         <h2 class="section-title">Chargement (m³)</h2>
         <div class="form-group">
-            <label>Volume Total à Charger (m³) :</label>
-            <input type="number" id="loadTarget">
+            <label>Date/Heure de début (Optionnel - Par défaut : Maintenant) :</label>
+            <input type="datetime-local" id="loadStartTime">
         </div>
-        <div class="form-group">
-            <label>Volume Actuel à Bord (m³) :</label>
-            <input type="number" id="loadCurrent">
+
+        <div class="form-group" style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #e0f7fa;">
+            <label>Séquence de Chargement (Produits) :</label>
+            <div id="loadingProductsContainer"></div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="calc-btn" onclick="addLoadingProduct()" style="flex:1; background-color:#0097a7;">+ Ajouter Produit</button>
+                <button class="calc-btn" onclick="resetLoadingProducts()" style="flex:1; background-color:#757575;">Réinitialiser</button>
+            </div>
         </div>
-        <div class="form-group">
-            <label>Taux de Chargement (m³/h) :</label>
-            <input type="number" id="loadRate">
-        </div>
+
         <button class="action-btn" onclick="calculateLoading()">Calculer Chargement</button>
 
         <div id="resultLoad" class="result-box">
@@ -161,23 +163,38 @@
             <div class="result-item" style="font-size: 1.3em; font-weight: bold;">
                 Temps restant : <span id="loadTime">0h 00m</span>
             </div>
+            <div id="loadExtraInfo" style="margin-top:15px; border-top: 1px dashed #bbb; padding-top:10px;"></div>
         </div>
     </div>
 
     <div id="unloading" class="tab-content">
         <h2 class="section-title">Déchargement (m³)</h2>
         <div class="form-group">
+            <label>Date/Heure de début (Optionnel - Par défaut : Maintenant) :</label>
+            <input type="datetime-local" id="unloadStartTime">
+        </div>
+        <div class="form-group">
             <label>Volume Initial (m³) :</label>
             <input type="number" id="unloadStart">
         </div>
         <div class="form-group">
-            <label>Volume Restant (m³) :</label>
-            <input type="number" id="unloadCurrent">
+            <label>Volume Déchargé (m³) :</label>
+            <input type="number" id="unloadDischarged">
         </div>
         <div class="form-group">
             <label>Taux de Pompage (m³/h) :</label>
             <input type="number" id="unloadRate">
         </div>
+
+        <div class="form-group" style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fff8e1;">
+            <label>Séquence Réservoirs à Terre (Optionnel) :</label>
+            <div id="shoreTanksContainer"></div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="calc-btn" onclick="addShoreTank()" style="flex:1; background-color:#f57f17;">+ Ajouter Réservoir</button>
+                <button class="calc-btn" onclick="resetShoreTanks()" style="flex:1; background-color:#757575;">Réinitialiser</button>
+            </div>
+        </div>
+
         <button class="action-btn" onclick="calculateUnloading()">Calculer Déchargement</button>
 
         <div id="resultUnload" class="result-box">
@@ -187,6 +204,7 @@
             <div class="result-item" style="font-size: 1.3em; font-weight: bold;">
                 Temps restant : <span id="unloadTime">0h 00m</span>
             </div>
+            <div id="unloadExtraInfo" style="margin-top:15px; border-top: 1px dashed #bbb; padding-top:10px;"></div>
         </div>
     </div>
 </div>
@@ -234,13 +252,13 @@
 
         // 3. Calcul de la Hauteur théorique
         // Formule : Hauteur = Volume / (Surface * Coefficient de Remplissage)
-        // On utilise un coefficient de 0.85 (Block Coefficient moyen pour tankers) 
+        // On utilise un coefficient de 0.85 (Block Coefficient moyen pour tankers)
         // car le navire n'est pas une boîte carrée parfaite.
         let estimatedHeight = totalVolume / (area * 0.85);
 
         // Mise à jour du champ
         document.getElementById('tankHeight').value = estimatedHeight.toFixed(2);
-        
+
         alert("Hauteur estimée à " + estimatedHeight.toFixed(2) + " mètres (basée sur un coefficient de coque de 0.85).");
     }
 
@@ -249,7 +267,7 @@
         tanks = parseFloat(document.getElementById('numTanks').value) || 0;
         height = parseFloat(document.getElementById('tankHeight').value) || 0;
         density = parseFloat(document.getElementById('density').value) || 1.025;
-        
+
         document.getElementById('configMsg').style.display = 'block';
         setTimeout(() => { document.getElementById('configMsg').style.display = 'none'; }, 2000);
     }
@@ -273,40 +291,338 @@
         document.getElementById('result1m').style.display = 'block';
     }
 
+    // --- Loading Multiple Products Logic ---
+    let loadProdCount = 0;
+    function addLoadingProduct() {
+        loadProdCount++;
+        const div = document.createElement('div');
+        div.className = 'load-prod-row';
+        div.style.display = 'flex';
+        div.style.flexDirection = 'column';
+        div.style.gap = '5px';
+        div.style.marginBottom = '15px';
+        div.style.padding = '10px';
+        div.style.border = '1px solid #ddd';
+        div.style.borderRadius = '4px';
+        div.style.backgroundColor = '#fafafa';
+
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <input type="text" placeholder="Nom du Produit (Ex: Prod A)" class="load-prod-name" style="width:70%;">
+                <button onclick="this.parentElement.parentElement.remove()" style="background:#e57373; color:white; border:none; border-radius:3px; padding:5px; cursor:pointer; font-size:0.8em;">X</button>
+            </div>
+
+            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <div style="flex:1;"><label style="font-size:0.8em;">Total (m³)</label><input type="number" class="load-prod-target"></div>
+                <div style="flex:1;"><label style="font-size:0.8em;">À bord (m³)</label><input type="number" class="load-prod-current"></div>
+                <div style="flex:1;"><label style="font-size:0.8em;">Taux (m³/h)</label><input type="number" class="load-prod-rate"></div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:5px; padding-top:5px; border-top:1px dashed #ccc;">
+                 <label style="display:flex; align-items:center; font-size:0.9em; color:#d84315; cursor:pointer; margin-bottom:5px;">
+                    <input type="checkbox" class="load-prod-sampling" style="width:auto; margin-right:5px;">
+                    Echantillonnage 1m (+45min)
+                </label>
+                 <label style="display:flex; align-items:center; font-size:0.9em; color:#006064; cursor:pointer;">
+                    <input type="checkbox" class="load-prod-shift-toggle" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
+                    Arrêt déplacement pendant ce produit
+                </label>
+                <div class="load-prod-shift-details" style="display:none; gap:5px; background:#e0f2f1; padding:5px; border-radius:3px;">
+                     <div style="flex:1;"><label style="font-size:0.8em;">Arrêt si reste (m³)</label><input type="number" class="load-prod-shift-rem" placeholder="Ex: 500"></div>
+                     <div style="flex:1;"><label style="font-size:0.8em;">Durée (min)</label><input type="number" class="load-prod-shift-dur" placeholder="Ex: 60"></div>
+                </div>
+            </div>
+
+            <div style="margin-top:5px;">
+                <label style="font-size:0.8em;">Délai APRES ce produit (min) :</label>
+                <input type="number" class="load-prod-delay-after" placeholder="Ex: 30">
+            </div>
+        `;
+        document.getElementById('loadingProductsContainer').appendChild(div);
+    }
+
+    function resetLoadingProducts() {
+        document.getElementById('loadingProductsContainer').innerHTML = '';
+        loadProdCount = 0;
+        addLoadingProduct();
+    }
+
     function calculateLoading() {
-        let target = parseFloat(document.getElementById('loadTarget').value) || 0;
-        let current = parseFloat(document.getElementById('loadCurrent').value) || 0;
-        let rate = parseFloat(document.getElementById('loadRate').value) || 0;
-        if (rate === 0) return;
+        let totalTarget = 0;
+        let totalCurrent = 0;
+        let totalRemaining = 0;
+        let totalTimeHours = 0;
 
-        let remaining = target - current;
-        let percent = (current / target) * 100;
-        let timeHours = remaining / rate;
-        let h = Math.floor(timeHours);
-        let m = Math.round((timeHours - h) * 60);
+        let startTimeVal = document.getElementById('loadStartTime').value;
+        let now = startTimeVal ? new Date(startTimeVal) : new Date();
 
-        document.getElementById('loadRemaining').innerText = remaining.toFixed(1);
+        let cumulativeTimeMins = 0;
+        let extraHtml = "";
+        let productScheduleHtml = "";
+
+        // Iterate Products
+        const rows = document.querySelectorAll('.load-prod-row');
+        let hasData = false;
+
+        if (rows.length > 0) {
+             productScheduleHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:#0097a7;">Séquence de Chargement :</h4>`;
+        }
+
+        rows.forEach(row => {
+            let name = row.querySelector('.load-prod-name').value || "Produit";
+            let t = parseFloat(row.querySelector('.load-prod-target').value) || 0;
+            let c = parseFloat(row.querySelector('.load-prod-current').value) || 0;
+            let r = parseFloat(row.querySelector('.load-prod-rate').value) || 0;
+            let delayAfter = parseFloat(row.querySelector('.load-prod-delay-after').value) || 0;
+
+            let rem = t - c;
+            if (rem < 0) rem = 0;
+
+            totalTarget += t;
+            totalCurrent += c;
+            totalRemaining += rem;
+
+            if (t > 0 || r > 0) hasData = true;
+
+            // Sampling Logic
+            let samplingEnabled = row.querySelector('.load-prod-sampling').checked;
+            if (samplingEnabled) {
+                cumulativeTimeMins += 45;
+            }
+
+            // Shift Logic for this product
+            let shiftEnabled = row.querySelector('.load-prod-shift-toggle').checked;
+            let shiftDuration = 0;
+            let shiftMsg = "";
+            let pumpingDurationHours = (r > 0) ? (rem / r) : 0;
+            let pumpingDurationMins = pumpingDurationHours * 60;
+
+            if (shiftEnabled && rem > 0 && r > 0) {
+                 let shiftTrigger = parseFloat(row.querySelector('.load-prod-shift-rem').value) || 0;
+                 let shiftDurInput = parseFloat(row.querySelector('.load-prod-shift-dur').value) || 0;
+
+                 // Logic: Stop when 'shiftTrigger' remains FOR THIS PRODUCT.
+                 // So we pump (rem - shiftTrigger).
+                 let volBeforeStop = rem - shiftTrigger;
+
+                 if (volBeforeStop > 0) {
+                     let timeToStopMins = (volBeforeStop / r) * 60;
+                     shiftDuration = shiftDurInput;
+
+                     // Add pre-stop pumping time
+                     cumulativeTimeMins += timeToStopMins;
+                     let stopDate = addMinutes(now, cumulativeTimeMins);
+
+                     // Add Shift Duration
+                     cumulativeTimeMins += shiftDuration;
+
+                     // Add remaining pumping time
+                     let remainingPumpingMins = pumpingDurationMins - timeToStopMins;
+                     cumulativeTimeMins += remainingPumpingMins;
+
+                     shiftMsg = `<div style="font-size:0.9em; color:#e65100; margin-left:10px;">➜ Arrêt dépla. (${shiftDuration}m) à ${formatDateTime(stopDate)}</div>`;
+                 } else {
+                     // Shift trigger not met (already past or equal), just pump
+                     cumulativeTimeMins += pumpingDurationMins;
+                 }
+            } else {
+                 cumulativeTimeMins += pumpingDurationMins;
+            }
+
+            // Add Delay After
+            if (delayAfter > 0) {
+                cumulativeTimeMins += delayAfter;
+            }
+
+            totalTimeHours = cumulativeTimeMins / 60;
+            let pEndDate = addMinutes(now, cumulativeTimeMins);
+
+            if (rem > 0 || delayAfter > 0 || samplingEnabled) {
+                productScheduleHtml += `
+                    <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                        <div style="display:flex; justify-content:space-between; font-size:1em;">
+                            <strong>${name} (${rem.toFixed(0)} m³)</strong>
+                            <span>Fin : ${formatDateTime(pEndDate)}</span>
+                        </div>
+                        ${samplingEnabled ? `<div style="font-size:0.9em; color:#d84315; margin-left:10px;">➜ Echantillonnage 1m (+45 min)</div>` : ''}
+                        ${shiftMsg}
+                        ${delayAfter > 0 ? `<div style="font-size:0.9em; color:#666; margin-left:10px;">➜ Délai après : ${delayAfter} min</div>` : ''}
+                    </div>
+                `;
+            }
+        });
+
+        productScheduleHtml += `</div>`;
+
+        if (!hasData) return;
+
+        let percent = (totalTarget > 0) ? (totalCurrent / totalTarget) * 100 : 0;
+
+        let h = Math.floor(totalTimeHours);
+        let m = Math.round((totalTimeHours - h) * 60);
+        let endDate = addMinutes(now, totalTimeHours * 60);
+
+        document.getElementById('loadRemaining').innerText = totalRemaining.toFixed(1);
         document.getElementById('loadPercent').innerText = percent.toFixed(1);
         document.getElementById('loadTime').innerText = h + "h " + m + "m";
         document.getElementById('resultLoad').style.display = 'block';
+
+        extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée : ${formatDateTime(endDate)}</div>`;
+        extraHtml += productScheduleHtml;
+
+        document.getElementById('loadExtraInfo').innerHTML = extraHtml;
+    }
+
+    // --- Unloading Logic with Multiple Tanks ---
+    let tankCount = 0;
+    function addShoreTank() {
+        tankCount++;
+        const div = document.createElement('div');
+        div.className = 'shore-tank-row';
+        div.style.display = 'flex';
+        div.style.gap = '10px';
+        div.style.marginBottom = '5px';
+        div.innerHTML = `
+            <input type="text" placeholder="Nom (Ex: Tk 1)" class="tank-name" style="flex:1;">
+            <input type="number" placeholder="Qté (m³)" class="tank-qty" style="flex:1;">
+            <input type="number" placeholder="Délai (min)" class="tank-delay" style="flex:0.5;">
+        `;
+        document.getElementById('shoreTanksContainer').appendChild(div);
+    }
+
+    function resetShoreTanks() {
+        document.getElementById('shoreTanksContainer').innerHTML = '';
+        tankCount = 0;
+        addShoreTank();
     }
 
     function calculateUnloading() {
         let start = parseFloat(document.getElementById('unloadStart').value) || 0;
-        let current = parseFloat(document.getElementById('unloadCurrent').value) || 0;
+        let discharged = parseFloat(document.getElementById('unloadDischarged').value) || 0;
         let rate = parseFloat(document.getElementById('unloadRate').value) || 0;
         if (rate === 0) return;
 
-        let done = start - current;
-        let timeHours = current / rate; 
-        let h = Math.floor(timeHours);
-        let m = Math.round((timeHours - h) * 60);
+        let current = start - discharged; // Remaining
+        if (current < 0) current = 0;
 
-        document.getElementById('unloadDone').innerText = done.toFixed(1);
+        let startTimeVal = document.getElementById('unloadStartTime').value;
+        let now = startTimeVal ? new Date(startTimeVal) : new Date();
+
+        let extraHtml = "";
+
+        // Shore Tanks Schedule with Slow Start Logic
+        const tankRows = document.querySelectorAll('.shore-tank-row');
+        let hasTanks = false;
+        tankRows.forEach(row => { if(row.querySelector('.tank-qty').value) hasTanks = true; });
+
+        let totalDurationMins = 0;
+
+        if (hasTanks) {
+            extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:#e65100;">Séquence Réservoirs (avec début lent 30 min max 3000 m³/h) :</h4>`;
+
+            // Effective slow rate is min(3000, userRate)
+            let slowRate = Math.min(3000, rate);
+            // Volume moved in 30 mins at slow rate = slowRate * 0.5 hours
+            let volIn30Mins = slowRate * 0.5;
+
+            let totalTankQty = 0;
+
+            tankRows.forEach((row, index) => {
+                let name = row.querySelector('.tank-name').value || `Réservoir ${index + 1}`;
+                let qty = parseFloat(row.querySelector('.tank-qty').value) || 0;
+                let delay = parseFloat(row.querySelector('.tank-delay').value) || 0;
+
+                if (qty > 0) {
+                    totalTankQty += qty;
+
+                    // Add User Delay first
+                    totalDurationMins += delay;
+
+                    // Calculate Duration for this tank
+                    let durationHours = 0;
+
+                    if (qty <= volIn30Mins) {
+                        // Tank is small, finishes during slow start phase
+                        durationHours = qty / slowRate;
+                    } else {
+                        // Tank has slow start for 30 mins, then normal rate
+                        let remainingAfter30 = qty - volIn30Mins;
+                        durationHours = 0.5 + (remainingAfter30 / rate);
+                    }
+
+                    let durationMins = durationHours * 60;
+                    totalDurationMins += durationMins;
+
+                    let tankEndTime = addMinutes(now, totalDurationMins);
+
+                    extraHtml += `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em;">
+                            <span>${name} (${qty} m³) ${delay > 0 ? `<i style="font-size:0.8em; color:#666;">(+${delay}m)</i>` : ''}</span>
+                            <span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>
+                        </div>
+                    `;
+                }
+            });
+
+            // Check for unassigned remaining volume
+            let unassigned = current - totalTankQty;
+            if (unassigned > 0.01) { // small epsilon
+                 let unassignedHours = unassigned / rate;
+                 let unassignedMins = unassignedHours * 60;
+                 totalDurationMins += unassignedMins;
+                 let finalEndTime = addMinutes(now, totalDurationMins);
+
+                 extraHtml += `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em; color:#666; font-style:italic;">
+                        <span>Reste non assigné (${unassigned.toFixed(1)} m³)</span>
+                        <span>Fin : ${formatDateTime(finalEndTime)}</span>
+                    </div>
+                `;
+            } else if (unassigned < -0.01) {
+                 extraHtml += `<div style="color:red; font-size:0.9em;">Attention: La somme des réservoirs (${totalTankQty} m³) dépasse le reste à pomper !</div>`;
+            }
+
+            let finalDate = addMinutes(now, totalDurationMins);
+            extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée (Ajustée) : ${formatDateTime(finalDate)}</div>` + extraHtml;
+            extraHtml += `</div>`;
+
+        } else {
+             // Fallback for simple calculation without tanks list
+             let timeHours = current / rate;
+             totalDurationMins = timeHours * 60;
+             let endDate = addMinutes(now, totalDurationMins);
+             extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée (Simple) : ${formatDateTime(endDate)}</div>`;
+        }
+
+        let h = Math.floor(totalDurationMins / 60);
+        let m = Math.round(totalDurationMins % 60);
+
+        document.getElementById('unloadDone').innerText = discharged.toFixed(1);
         document.getElementById('unloadRemaining').innerText = current.toFixed(1);
         document.getElementById('unloadTime').innerText = h + "h " + m + "m";
         document.getElementById('resultUnload').style.display = 'block';
+
+        document.getElementById('unloadExtraInfo').innerHTML = extraHtml;
     }
+
+    // --- Utilitaires de Date ---
+    function formatDateTime(date) {
+        const d = new Date(date);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+    }
+
+    function addMinutes(date, minutes) {
+        return new Date(date.getTime() + minutes * 60000);
+    }
+
+    // Init
+    addShoreTank();
+    addLoadingProduct();
 </script>
 
 </body>
