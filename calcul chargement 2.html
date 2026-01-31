@@ -141,6 +141,10 @@
     <div id="loading" class="tab-content">
         <h2 class="section-title">Chargement (m³)</h2>
         <div class="form-group">
+            <label>Date/Heure de début (Optionnel - Par défaut : Maintenant) :</label>
+            <input type="datetime-local" id="loadStartTime">
+        </div>
+        <div class="form-group">
             <label>Volume Total à Charger (m³) :</label>
             <input type="number" id="loadTarget">
         </div>
@@ -181,6 +185,10 @@
 
     <div id="unloading" class="tab-content">
         <h2 class="section-title">Déchargement (m³)</h2>
+        <div class="form-group">
+            <label>Date/Heure de début (Optionnel - Par défaut : Maintenant) :</label>
+            <input type="datetime-local" id="unloadStartTime">
+        </div>
         <div class="form-group">
             <label>Volume Initial (m³) :</label>
             <input type="number" id="unloadStart">
@@ -318,7 +326,9 @@
         // --- Shift Logic ---
         let shiftEnabled = document.getElementById('loadShiftEnabled').checked;
         let shiftMsg = "";
-        let now = new Date();
+
+        let startTimeVal = document.getElementById('loadStartTime').value;
+        let now = startTimeVal ? new Date(startTimeVal) : new Date();
 
         if (shiftEnabled) {
             let shiftTrigger = parseFloat(document.getElementById('loadShiftRemaining').value) || 0;
@@ -389,7 +399,10 @@
         if (rate === 0) return;
 
         let done = start - current;
-        let now = new Date();
+
+        let startTimeVal = document.getElementById('unloadStartTime').value;
+        let now = startTimeVal ? new Date(startTimeVal) : new Date();
+
         let extraHtml = "";
 
         // Shore Tanks Schedule with Slow Start Logic
