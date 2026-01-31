@@ -687,10 +687,41 @@
         if (hasTanks) {
             extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:var(--text-est-title);">Séquence Réservoirs :</h4>`;
 
+            // Pre-calculation: Auto-fill last tank if needed
+            let sumOtherTanks = 0;
+            let lastTankIndex = tankRows.length - 1;
+
+            // Calculate sum of all valid quantities EXCEPT the last one if it's empty/0
+            for(let i=0; i<tankRows.length; i++) {
+                let q = parseFloat(tankRows[i].querySelector('.tank-qty').value) || 0;
+                if (i !== lastTankIndex || q > 0) {
+                    sumOtherTanks += q;
+                }
+            }
+
             tankRows.forEach((row, index) => {
                 let name = row.querySelector('.tank-name').value || `Réservoir ${index + 1}`;
-                let qty = parseFloat(row.querySelector('.tank-qty').value) || 0;
+                let qtyInput = parseFloat(row.querySelector('.tank-qty').value) || 0;
                 let delay = parseFloat(row.querySelector('.tank-delay').value) || 0;
+
+                let qty = qtyInput;
+                let isAutoCalc = false;
+
+                // Auto-calc logic for last tank
+                if (index === lastTankIndex && qtyInput === 0) {
+                    let remainder = current - sumOtherTanks; // current is remaining to pump globally
+                    // Wait, 'current' is (Start - Discharged).
+                    // We need to base the auto-fill on the TOTAL Start volume vs Other Tanks capacity.
+                    // If user says "Start 5000", Tank1=2000. Then Tank2 should be 3000.
+                    // Regardless of how much is discharged.
+                    let totalStart = parseFloat(document.getElementById('unloadStart').value) || 0;
+                    let autoVal = totalStart - sumOtherTanks;
+
+                    if (autoVal > 0) {
+                        qty = autoVal;
+                        isAutoCalc = true;
+                    }
+                }
 
                 // Slowdown inputs
                 let slowRateInput = parseFloat(row.querySelector('.tank-slow-rate').value) || 0;
@@ -815,13 +846,14 @@
                     extraHtml += `
                         <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px; ${tankClass}">
                             <div style="display:flex; justify-content:space-between; font-size:1em;">
-                                <span>${name} (${qty} m³) ${tankStatus}</span>
+                                <span>${name} (${qty} m³${isAutoCalc ? '*' : ''}) ${tankStatus}</span>
                                 ${tankStatus !== "" ?
                                     `<span>-</span>` :
                                     `<span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>`
                                 }
                             </div>
                             ${msgs.join('')}
+                            ${isAutoCalc ? `<div style="font-size:0.8em; color:var(--primary); font-style:italic;">* Calculé automatiquement (Reste)</div>` : ''}
                         </div>
                     `;
                 }
