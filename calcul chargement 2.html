@@ -316,17 +316,40 @@
         const div = document.createElement('div');
         div.className = 'load-prod-row';
         div.style.display = 'flex';
-        div.style.flexDirection = 'column'; // Stack on mobile, but let's try row on desktop
+        div.style.flexDirection = 'column';
         div.style.gap = '5px';
-        div.style.marginBottom = '10px';
-        div.style.padding = '8px';
-        div.style.borderBottom = '1px dashed #ccc';
+        div.style.marginBottom = '15px';
+        div.style.padding = '10px';
+        div.style.border = '1px solid #ddd';
+        div.style.borderRadius = '4px';
+        div.style.backgroundColor = '#fafafa';
+
         div.innerHTML = `
-            <input type="text" placeholder="Nom du Produit (Ex: Prod A)" class="load-prod-name" style="width:100%; margin-bottom:5px;">
-            <div style="display:flex; gap:5px;">
-                <input type="number" placeholder="Total (m³)" class="load-prod-target" style="flex:1;">
-                <input type="number" placeholder="À bord (m³)" class="load-prod-current" style="flex:1;">
-                <input type="number" placeholder="Taux (m³/h)" class="load-prod-rate" style="flex:1;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <input type="text" placeholder="Nom du Produit (Ex: Prod A)" class="load-prod-name" style="width:70%;">
+                <button onclick="this.parentElement.parentElement.remove()" style="background:#e57373; color:white; border:none; border-radius:3px; padding:5px; cursor:pointer; font-size:0.8em;">X</button>
+            </div>
+
+            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                <div style="flex:1;"><label style="font-size:0.8em;">Total (m³)</label><input type="number" class="load-prod-target"></div>
+                <div style="flex:1;"><label style="font-size:0.8em;">À bord (m³)</label><input type="number" class="load-prod-current"></div>
+                <div style="flex:1;"><label style="font-size:0.8em;">Taux (m³/h)</label><input type="number" class="load-prod-rate"></div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:5px; padding-top:5px; border-top:1px dashed #ccc;">
+                 <label style="display:flex; align-items:center; font-size:0.9em; color:#006064; cursor:pointer;">
+                    <input type="checkbox" class="load-prod-shift-toggle" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
+                    Arrêt déplacement pendant ce produit
+                </label>
+                <div class="load-prod-shift-details" style="display:none; gap:5px; background:#e0f2f1; padding:5px; border-radius:3px;">
+                     <div style="flex:1;"><label style="font-size:0.8em;">Arrêt si reste (m³)</label><input type="number" class="load-prod-shift-rem" placeholder="Ex: 500"></div>
+                     <div style="flex:1;"><label style="font-size:0.8em;">Durée (min)</label><input type="number" class="load-prod-shift-dur" placeholder="Ex: 60"></div>
+                </div>
+            </div>
+
+            <div style="margin-top:5px;">
+                <label style="font-size:0.8em;">Délai APRES ce produit (min) :</label>
+                <input type="number" class="load-prod-delay-after" placeholder="Ex: 30">
             </div>
         `;
         document.getElementById('loadingProductsContainer').appendChild(div);
@@ -344,15 +367,27 @@
         let totalRemaining = 0;
         let totalTimeHours = 0;
 
-        // Iterate Products to calc basics
+        let startTimeVal = document.getElementById('loadStartTime').value;
+        let now = startTimeVal ? new Date(startTimeVal) : new Date();
+
+        let cumulativeTimeMins = 0;
+        let extraHtml = "";
+        let productScheduleHtml = "";
+
+        // Iterate Products
         const rows = document.querySelectorAll('.load-prod-row');
-        let productData = [];
+        let hasData = false;
+
+        if (rows.length > 0) {
+             productScheduleHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:#0097a7;">Séquence de Chargement :</h4>`;
+        }
 
         rows.forEach(row => {
             let name = row.querySelector('.load-prod-name').value || "Produit";
             let t = parseFloat(row.querySelector('.load-prod-target').value) || 0;
             let c = parseFloat(row.querySelector('.load-prod-current').value) || 0;
             let r = parseFloat(row.querySelector('.load-prod-rate').value) || 0;
+            let delayAfter = parseFloat(row.querySelector('.load-prod-delay-after').value) || 0;
 
             let rem = t - c;
             if (rem < 0) rem = 0;
@@ -361,70 +396,77 @@
             totalCurrent += c;
             totalRemaining += rem;
 
-            let duration = (r > 0) ? (rem / r) : 0;
-            totalTimeHours += duration;
+            if (t > 0 || r > 0) hasData = true;
 
-            if (rem > 0) {
-                productData.push({name: name, remaining: rem, rate: r, duration: duration});
+            // Shift Logic for this product
+            let shiftEnabled = row.querySelector('.load-prod-shift-toggle').checked;
+            let shiftDuration = 0;
+            let shiftMsg = "";
+            let pumpingDurationHours = (r > 0) ? (rem / r) : 0;
+            let pumpingDurationMins = pumpingDurationHours * 60;
+
+            if (shiftEnabled && rem > 0 && r > 0) {
+                 let shiftTrigger = parseFloat(row.querySelector('.load-prod-shift-rem').value) || 0;
+                 let shiftDurInput = parseFloat(row.querySelector('.load-prod-shift-dur').value) || 0;
+
+                 // Logic: Stop when 'shiftTrigger' remains FOR THIS PRODUCT.
+                 // So we pump (rem - shiftTrigger).
+                 let volBeforeStop = rem - shiftTrigger;
+
+                 if (volBeforeStop > 0) {
+                     let timeToStopMins = (volBeforeStop / r) * 60;
+                     shiftDuration = shiftDurInput;
+
+                     // Add pre-stop pumping time
+                     cumulativeTimeMins += timeToStopMins;
+                     let stopDate = addMinutes(now, cumulativeTimeMins);
+
+                     // Add Shift Duration
+                     cumulativeTimeMins += shiftDuration;
+
+                     // Add remaining pumping time
+                     let remainingPumpingMins = pumpingDurationMins - timeToStopMins;
+                     cumulativeTimeMins += remainingPumpingMins;
+
+                     shiftMsg = `<div style="font-size:0.9em; color:#e65100; margin-left:10px;">➜ Arrêt dépla. (${shiftDuration}m) à ${formatDateTime(stopDate)}</div>`;
+                 } else {
+                     // Shift trigger not met (already past or equal), just pump
+                     cumulativeTimeMins += pumpingDurationMins;
+                 }
+            } else {
+                 cumulativeTimeMins += pumpingDurationMins;
+            }
+
+            // Add Delay After
+            if (delayAfter > 0) {
+                cumulativeTimeMins += delayAfter;
+            }
+
+            totalTimeHours = cumulativeTimeMins / 60;
+            let pEndDate = addMinutes(now, cumulativeTimeMins);
+
+            if (rem > 0 || delayAfter > 0) {
+                productScheduleHtml += `
+                    <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                        <div style="display:flex; justify-content:space-between; font-size:1em;">
+                            <strong>${name} (${rem.toFixed(0)} m³)</strong>
+                            <span>Fin : ${formatDateTime(pEndDate)}</span>
+                        </div>
+                        ${shiftMsg}
+                        ${delayAfter > 0 ? `<div style="font-size:0.9em; color:#666; margin-left:10px;">➜ Délai après : ${delayAfter} min</div>` : ''}
+                    </div>
+                `;
             }
         });
 
-        if (totalTarget === 0 && totalTimeHours === 0) return; // Nothing entered
+        productScheduleHtml += `</div>`;
+
+        if (!hasData) return;
 
         let percent = (totalTarget > 0) ? (totalCurrent / totalTarget) * 100 : 0;
 
-        // --- Shift Logic (Global) ---
-        let shiftEnabled = document.getElementById('loadShiftEnabled').checked;
-        let shiftMsg = "";
-
-        let startTimeVal = document.getElementById('loadStartTime').value;
-        let now = startTimeVal ? new Date(startTimeVal) : new Date();
-
-        // Variables to track cumulative time including shift delays
-        let shiftDelayAdded = 0;
-        let shiftStopMins = -1; // -1 means no stop found/triggered
-
-        if (shiftEnabled) {
-            let shiftTrigger = parseFloat(document.getElementById('loadShiftRemaining').value) || 0;
-            let shiftDurationMins = parseFloat(document.getElementById('loadShiftDuration').value) || 0;
-
-            // "Stop when X amount remains globally"
-            let volBeforeStop = totalRemaining - shiftTrigger;
-
-            if (volBeforeStop > 0) {
-                 // Calculate time to reach volBeforeStop by walking the product sequence
-                 let tempVol = 0;
-                 let timeToStop = 0;
-
-                 for (let p of productData) {
-                     let needed = volBeforeStop - tempVol;
-                     if (needed <= 0) break;
-
-                     if (p.remaining <= needed) {
-                         tempVol += p.remaining;
-                         timeToStop += p.duration;
-                     } else {
-                         let partialVol = needed;
-                         if (p.rate > 0) timeToStop += (partialVol / p.rate);
-                         tempVol += partialVol;
-                         break;
-                     }
-                 }
-
-                 shiftStopMins = timeToStop * 60; // exact minute relative to start where stop occurs
-
-                 let stopDate = addMinutes(now, shiftStopMins);
-                 shiftMsg = `<div class="result-item" style="color: #e65100;"><strong>Arrêt prévu à :</strong> <span>${formatDateTime(stopDate)}</span></div>`;
-
-                 shiftDelayAdded = shiftDurationMins / 60; // in hours
-                 totalTimeHours += shiftDelayAdded;
-                 shiftMsg += `<div class="result-item" style="font-size:0.9em; color:#666;">(+ ${shiftDurationMins} min de délai)</div>`;
-            }
-        }
-
         let h = Math.floor(totalTimeHours);
         let m = Math.round((totalTimeHours - h) * 60);
-
         let endDate = addMinutes(now, totalTimeHours * 60);
 
         document.getElementById('loadRemaining').innerText = totalRemaining.toFixed(1);
@@ -432,45 +474,8 @@
         document.getElementById('loadTime').innerText = h + "h " + m + "m";
         document.getElementById('resultLoad').style.display = 'block';
 
-        let extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée : ${formatDateTime(endDate)}</div>`;
-        if (shiftMsg) extraHtml += shiftMsg;
-
-        // --- Detailed Product Schedule ---
-        if (productData.length > 0) {
-             extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:#0097a7;">Séquence de Chargement :</h4>`;
-             let cumulativeTimeMins = 0;
-             let delayAlreadyAdded = false;
-
-             productData.forEach(p => {
-                 let startMins = cumulativeTimeMins;
-                 let durationMins = p.duration * 60;
-                 let endMins = startMins + durationMins;
-
-                 // Check if Shift Stop happens inside this product or right at the end
-                 // Note: If Shift Stop is exactly at endMins, we add delay after this product.
-                 // If Shift Stop is inside, we add delay to this product's finish time.
-
-                 if (shiftStopMins >= 0 && !delayAlreadyAdded) {
-                     // Check overlap
-                     if (shiftStopMins >= startMins && shiftStopMins <= endMins + 0.01) {
-                         // Stop occurs during or at end of this product
-                         cumulativeTimeMins += (document.getElementById('loadShiftDuration').value * 1);
-                         delayAlreadyAdded = true;
-                     }
-                 }
-
-                 cumulativeTimeMins += durationMins;
-                 let pEndDate = addMinutes(now, cumulativeTimeMins);
-
-                 extraHtml += `
-                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em;">
-                        <span>${p.name} (${p.remaining.toFixed(0)} m³)</span>
-                        <span style="font-weight:bold;">Fin : ${formatDateTime(pEndDate)}</span>
-                    </div>
-                `;
-             });
-             extraHtml += `</div>`;
-        }
+        extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée : ${formatDateTime(endDate)}</div>`;
+        extraHtml += productScheduleHtml;
 
         document.getElementById('loadExtraInfo').innerHTML = extraHtml;
     }
