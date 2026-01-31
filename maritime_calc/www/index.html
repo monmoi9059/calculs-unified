@@ -667,7 +667,7 @@
         let rate = parseFloat(document.getElementById('unloadRate').value) || 0;
         if (rate === 0) return;
 
-        let current = start - discharged; // Remaining
+        let current = start - discharged; // Remaining to pump globally
         if (current < 0) current = 0;
 
         let startTimeVal = document.getElementById('unloadStartTime').value;
@@ -681,16 +681,47 @@
         tankRows.forEach(row => { if(row.querySelector('.tank-qty').value) hasTanks = true; });
 
         let totalDurationMins = 0;
+        let remainingDischargedForCalc = discharged; // Volume "already done" to distribute
+        let totalRemainingCapacityInTanks = 0; // To track unassigned
 
         if (hasTanks) {
             extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:var(--text-est-title);">Séquence Réservoirs :</h4>`;
 
-            let totalTankQty = 0;
+            // Pre-calculation: Auto-fill last tank if needed
+            let sumOtherTanks = 0;
+            let lastTankIndex = tankRows.length - 1;
+
+            // Calculate sum of all valid quantities EXCEPT the last one if it's empty/0
+            for(let i=0; i<tankRows.length; i++) {
+                let q = parseFloat(tankRows[i].querySelector('.tank-qty').value) || 0;
+                if (i !== lastTankIndex || q > 0) {
+                    sumOtherTanks += q;
+                }
+            }
 
             tankRows.forEach((row, index) => {
                 let name = row.querySelector('.tank-name').value || `Réservoir ${index + 1}`;
-                let qty = parseFloat(row.querySelector('.tank-qty').value) || 0;
+                let qtyInput = parseFloat(row.querySelector('.tank-qty').value) || 0;
                 let delay = parseFloat(row.querySelector('.tank-delay').value) || 0;
+
+                let qty = qtyInput;
+                let isAutoCalc = false;
+
+                // Auto-calc logic for last tank
+                if (index === lastTankIndex && qtyInput === 0) {
+                    let remainder = current - sumOtherTanks; // current is remaining to pump globally
+                    // Wait, 'current' is (Start - Discharged).
+                    // We need to base the auto-fill on the TOTAL Start volume vs Other Tanks capacity.
+                    // If user says "Start 5000", Tank1=2000. Then Tank2 should be 3000.
+                    // Regardless of how much is discharged.
+                    let totalStart = parseFloat(document.getElementById('unloadStart').value) || 0;
+                    let autoVal = totalStart - sumOtherTanks;
+
+                    if (autoVal > 0) {
+                        qty = autoVal;
+                        isAutoCalc = true;
+                    }
+                }
 
                 // Slowdown inputs
                 let slowRateInput = parseFloat(row.querySelector('.tank-slow-rate').value) || 0;
@@ -698,81 +729,143 @@
                 let useSlowdown = row.querySelector('.tank-slow-toggle').checked && slowRateInput > 0 && slowDurInput > 0;
 
                 if (qty > 0) {
-                    totalTankQty += qty;
-
-                    // Add User Delay first
-                    totalDurationMins += delay;
-
-                    // Calculate Duration for this tank
-                    let tankDurationMins = 0;
-                    let remainingQty = qty;
-                    let msgs = [];
-
-                    // --- Phase 1: Standard Slow Start (30 min @ Max 3000 m³/h) ---
-                    let bypassCheck = row.querySelector('.tank-bypass-check');
-                    let isBypass = (index === 0 && bypassCheck && bypassCheck.checked);
-
-                    if (!isBypass) {
-                        let startDur = 30;
-                        // Limité à 3000 m³/h, ou le taux normal si inférieur
-                        let startRate = (rate > 3000) ? 3000 : rate;
-                        let startVol = startRate * (startDur / 60);
-
-                        if (remainingQty <= startVol) {
-                            let time = (remainingQty / startRate) * 60;
-                            tankDurationMins += time;
-                            msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage : ${time.toFixed(1)}m (Fin du tank)</div>`);
-                            remainingQty = 0;
-                        } else {
-                            tankDurationMins += startDur;
-                            remainingQty -= startVol;
-                            msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage standard : 30m @ ${startRate.toFixed(0)} m³/h</div>`);
-                        }
+                    // Determine how much of this tank is already filled
+                    let filledAlready = 0;
+                    if (remainingDischargedForCalc >= qty) {
+                        filledAlready = qty;
+                        remainingDischargedForCalc -= qty;
                     } else {
-                        msgs.push(`<div style="font-size:0.85em; color:#d84315; margin-left:10px;">➜ Démarrage standard bypassé</div>`);
+                        filledAlready = remainingDischargedForCalc;
+                        remainingDischargedForCalc = 0;
                     }
 
-                    // --- Phase 2: Manual Slowdown ---
-                    if (remainingQty > 0 && useSlowdown) {
-                        let volDuringSlow = slowRateInput * (slowDurInput / 60);
+                    let remainingInTank = qty - filledAlready;
+                    totalRemainingCapacityInTanks += remainingInTank;
 
-                        if (remainingQty <= volDuringSlow) {
-                            let time = (remainingQty / slowRateInput) * 60;
-                            tankDurationMins += time;
-                            msgs.push(`<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti Manuel : ${time.toFixed(1)}m (Fin du tank)</div>`);
-                            remainingQty = 0;
+                    let tankDurationMins = 0;
+                    let msgs = [];
+                    let tankStatus = "";
+                    let tankClass = ""; // For styling
+
+                    if (remainingInTank <= 0) {
+                         tankStatus = `<span style="color:grey; font-weight:bold;">(Terminé)</span>`;
+                         tankClass = "opacity: 0.5;";
+                    } else {
+                        // Tank is active or future
+                        let isPartial = (filledAlready > 0);
+
+                        // 1. Delay
+                        // Skip delay if partially filled (active)
+                        if (!isPartial) {
+                             totalDurationMins += delay;
+                             if (delay > 0) msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Délai avant : ${delay} min</div>`);
                         } else {
-                            tankDurationMins += slowDurInput;
-                            remainingQty -= volDuringSlow;
-                            msgs.push(`<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti Manuel : ${slowDurInput}m @ ${slowRateInput} m³/h</div>`);
+                             if (delay > 0) msgs.push(`<div style="font-size:0.85em; color:grey; text-decoration:line-through; margin-left:10px;">➜ Délai (Déjà passé)</div>`);
                         }
+
+                        // We have 'remainingInTank' to pump.
+                        // We need to see which phases are left.
+                        // We simulate the phases with volumes.
+
+                        let volDone = filledAlready; // The volume we have already traversed in the phases
+
+                        // --- Phase 1: Slow Start ---
+                        let bypassCheck = row.querySelector('.tank-bypass-check');
+                        let isBypass = (index === 0 && bypassCheck && bypassCheck.checked);
+                        let phase1Vol = 0;
+                        let phase1Rate = 0;
+                        let phase1Dur = 0;
+
+                        if (!isBypass) {
+                            phase1Dur = 30;
+                            phase1Rate = (rate > 3000) ? 3000 : rate;
+                            phase1Vol = phase1Rate * (phase1Dur / 60);
+                        }
+
+                        // Process Phase 1
+                        if (phase1Vol > 0) {
+                             if (volDone >= phase1Vol) {
+                                 // Phase 1 fully done
+                                 volDone -= phase1Vol;
+                                 msgs.push(`<div style="font-size:0.85em; color:grey; margin-left:10px;">➜ Démarrage (Terminé)</div>`);
+                             } else {
+                                 // Phase 1 partially or not done
+                                 let effectivePhase1Vol = Math.min(phase1Vol, qty); // Cap phase 1 by total tank size
+                                 let workLeftInPhase1 = effectivePhase1Vol - volDone;
+
+                                 // If workLeftInPhase1 > remainingInTank, clamp it.
+                                 if (workLeftInPhase1 > remainingInTank) workLeftInPhase1 = remainingInTank;
+
+                                 if (workLeftInPhase1 > 0) {
+                                     let time = (workLeftInPhase1 / phase1Rate) * 60;
+                                     tankDurationMins += time;
+                                     remainingInTank -= workLeftInPhase1;
+                                     msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage (Reste) : ${time.toFixed(1)}m @ ${phase1Rate.toFixed(0)}</div>`);
+                                 }
+
+                                 // We have consumed the 'volDone' for Phase 1 context.
+                                 volDone = 0;
+                             }
+                        }
+
+                        // --- Phase 2: Manual Slowdown ---
+                        if (remainingInTank > 0 && useSlowdown) {
+                            let phase2Vol = slowRateInput * (slowDurInput / 60);
+
+                            if (volDone >= phase2Vol) {
+                                // Phase 2 fully done
+                                volDone -= phase2Vol;
+                                msgs.push(`<div style="font-size:0.85em; color:grey; margin-left:10px;">➜ Ralenti (Terminé)</div>`);
+                            } else {
+                                // We are in Phase 2 or at start of it
+                                let workLeftInPhase2 = phase2Vol - volDone;
+                                if (workLeftInPhase2 > remainingInTank) workLeftInPhase2 = remainingInTank;
+
+                                if (workLeftInPhase2 > 0) {
+                                    let time = (workLeftInPhase2 / slowRateInput) * 60;
+                                    tankDurationMins += time;
+                                    remainingInTank -= workLeftInPhase2;
+                                     msgs.push(`<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti (Reste) : ${time.toFixed(1)}m @ ${slowRateInput}</div>`);
+                                }
+                                volDone = 0;
+                            }
+                        }
+
+                        // --- Phase 3: Normal ---
+                        if (remainingInTank > 0) {
+                             let time = (remainingInTank / rate) * 60;
+                             tankDurationMins += time;
+                             remainingInTank = 0;
+                        }
+
+                        totalDurationMins += tankDurationMins;
                     }
 
-                    // --- Phase 3: Normal Rate ---
-                    if (remainingQty > 0) {
-                        let timeNormal = (remainingQty / rate) * 60;
-                        tankDurationMins += timeNormal;
-                    }
-
-                    totalDurationMins += tankDurationMins;
                     let tankEndTime = addMinutes(now, totalDurationMins);
 
                     extraHtml += `
-                        <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                        <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px; ${tankClass}">
                             <div style="display:flex; justify-content:space-between; font-size:1em;">
-                                <span>${name} (${qty} m³)</span>
-                                <span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>
+                                <span>${name} (${qty} m³${isAutoCalc ? '*' : ''}) ${tankStatus}</span>
+                                ${tankStatus !== "" ?
+                                    `<span>-</span>` :
+                                    `<span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>`
+                                }
                             </div>
-                            ${delay > 0 ? `<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Délai avant : ${delay} min</div>` : ''}
                             ${msgs.join('')}
+                            ${isAutoCalc ? `<div style="font-size:0.8em; color:var(--primary); font-style:italic;">* Calculé automatiquement (Reste)</div>` : ''}
                         </div>
                     `;
                 }
             });
 
-            // Check for unassigned remaining volume
-            let unassigned = current - totalTankQty;
-            if (unassigned > 0.01) { // small epsilon
+            // Unassigned
+            // current is (Start - Discharged).
+            // totalRemainingCapacityInTanks is sum(Tank - Filled).
+            // unassigned = current - totalRemainingCapacityInTanks.
+            let unassigned = current - totalRemainingCapacityInTanks;
+
+             if (unassigned > 0.01) {
                  let unassignedHours = unassigned / rate;
                  let unassignedMins = unassignedHours * 60;
                  totalDurationMins += unassignedMins;
@@ -785,13 +878,12 @@
                     </div>
                 `;
             } else if (unassigned < -0.01) {
-                 extraHtml += `<div style="color:red; font-size:0.9em;">Attention: La somme des réservoirs (${totalTankQty} m³) dépasse le reste à pomper !</div>`;
+                 extraHtml += `<div style="color:red; font-size:0.9em;">Attention: La somme restante des réservoirs (${totalRemainingCapacityInTanks} m³) dépasse le reste à pomper (${current} m³) !</div>`;
             }
 
             let finalDate = addMinutes(now, totalDurationMins);
             extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée (Ajustée) : ${formatDateTime(finalDate)}</div>` + extraHtml;
             extraHtml += `</div>`;
-
         } else {
              // Fallback for simple calculation without tanks list
              let timeHours = current / rate;
