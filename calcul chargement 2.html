@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: https://ssl.gstatic.com 'unsafe-eval'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; media-src *; img-src 'self' data: content:;">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Calculateur Maritime Complet</title>
@@ -138,6 +139,10 @@
 
         .delete-btn { background-color: #e57373; color: white; border: none; border-radius: 3px; padding: 5px; cursor: pointer; font-size: 0.8em; }
         [data-theme="dark"] .delete-btn { background-color: #c62828; }
+
+        /* Bypass Checkbox Visibility Logic */
+        .tank-bypass-start { display: none; }
+        #shoreTanksContainer .shore-tank-row:first-child .tank-bypass-start { display: block; }
 
         /* Mobile Responsiveness */
         @media (max-width: 600px) {
@@ -630,6 +635,13 @@
             </div>
 
             <div style="border-top:1px dashed #ccc; padding-top:5px; margin-top:5px;">
+                <div class="tank-bypass-start" style="margin-bottom: 5px;">
+                     <label style="display:flex; align-items:center; font-size:0.9em; color:#d84315; cursor:pointer;">
+                        <input type="checkbox" class="tank-bypass-check" style="width:auto; margin-right:5px;">
+                        Bypass 30m Démarrage
+                    </label>
+                </div>
+
                 <label style="display:flex; align-items:center; font-size:0.9em; color:var(--orange-btn); cursor:pointer;">
                     <input type="checkbox" class="tank-slow-toggle" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
                     Ajouter Ralentissement
@@ -697,20 +709,27 @@
                     let msgs = [];
 
                     // --- Phase 1: Standard Slow Start (30 min @ Max 3000 m³/h) ---
-                    let startDur = 30;
-                    // Limité à 3000 m³/h, ou le taux normal si inférieur
-                    let startRate = (rate > 3000) ? 3000 : rate;
-                    let startVol = startRate * (startDur / 60);
+                    let bypassCheck = row.querySelector('.tank-bypass-check');
+                    let isBypass = (index === 0 && bypassCheck && bypassCheck.checked);
 
-                    if (remainingQty <= startVol) {
-                        let time = (remainingQty / startRate) * 60;
-                        tankDurationMins += time;
-                        msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage : ${time.toFixed(1)}m (Fin du tank)</div>`);
-                        remainingQty = 0;
+                    if (!isBypass) {
+                        let startDur = 30;
+                        // Limité à 3000 m³/h, ou le taux normal si inférieur
+                        let startRate = (rate > 3000) ? 3000 : rate;
+                        let startVol = startRate * (startDur / 60);
+
+                        if (remainingQty <= startVol) {
+                            let time = (remainingQty / startRate) * 60;
+                            tankDurationMins += time;
+                            msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage : ${time.toFixed(1)}m (Fin du tank)</div>`);
+                            remainingQty = 0;
+                        } else {
+                            tankDurationMins += startDur;
+                            remainingQty -= startVol;
+                            msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage standard : 30m @ ${startRate.toFixed(0)} m³/h</div>`);
+                        }
                     } else {
-                        tankDurationMins += startDur;
-                        remainingQty -= startVol;
-                        msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage standard : 30m @ ${startRate.toFixed(0)} m³/h</div>`);
+                        msgs.push(`<div style="font-size:0.85em; color:#d84315; margin-left:10px;">➜ Démarrage standard bypassé</div>`);
                     }
 
                     // --- Phase 2: Manual Slowdown ---
@@ -816,5 +835,6 @@
     addLoadingProduct();
 </script>
 
+    <script src="cordova.js"></script>
 </body>
 </html>
