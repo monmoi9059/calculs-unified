@@ -15,7 +15,7 @@
 
             /* Backgrounds & Surfaces */
             --bg-body: #f0f4f8;
-            --bg-container: rgba(255, 255, 255, 0.9);
+            --bg-container: #ffffff;
             --bg-input: #ffffff;
             --border-input: #cccccc;
             --shadow: rgba(0,0,0,0.1);
@@ -39,7 +39,7 @@
 
             /* Backgrounds & Surfaces */
             --bg-body: #121212;
-            --bg-container: rgba(30, 30, 30, 0.9);
+            --bg-container: #1e1e1e;
             --bg-input: #333333;
             --border-input: #555555;
             --shadow: rgba(0,0,0,0.5);
@@ -57,16 +57,11 @@
             font-family: 'Segoe UI', sans-serif;
             margin: 0;
             background-color: var(--bg-body);
-            background-image: url('menu_bg.png');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
             color: var(--text);
             transition: background-color 0.3s, color 0.3s;
         }
 
-        header { background: linear-gradient(to right, var(--secondary), var(--primary)); color: var(--light-text); padding: 1rem; text-align: center; position: relative; overflow: hidden; opacity: 0.95; }
-        header > * { position: relative; z-index: 1; }
+        header { background: linear-gradient(to right, var(--secondary), var(--primary)); color: var(--light-text); padding: 1rem; text-align: center; }
 
         .container {
             max-width: 800px;
@@ -76,13 +71,11 @@
             border-radius: 8px;
             box-shadow: 0 4px 15px var(--shadow);
             transition: background-color 0.3s;
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
         }
 
-        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; position: relative; overflow: hidden; border-radius: 4px; }
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
 
-        .tab-btn { flex: 1; padding: 15px; border: none; background: none; cursor: pointer; font-size: 16px; font-weight: bold; color: #666; transition: 0.3s; position: relative; z-index: 1; }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; cursor: pointer; font-size: 16px; font-weight: bold; color: #666; transition: 0.3s; }
         .tab-btn:hover { background-color: var(--accent); }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
 
