@@ -380,13 +380,15 @@
         let startTimeVal = document.getElementById('loadStartTime').value;
         let now = startTimeVal ? new Date(startTimeVal) : new Date();
 
+        // Variables to track cumulative time including shift delays
+        let shiftDelayAdded = 0;
+        let shiftStopMins = -1; // -1 means no stop found/triggered
+
         if (shiftEnabled) {
             let shiftTrigger = parseFloat(document.getElementById('loadShiftRemaining').value) || 0;
             let shiftDurationMins = parseFloat(document.getElementById('loadShiftDuration').value) || 0;
 
             // "Stop when X amount remains globally"
-            // We need to find WHEN this happens in the sequence.
-
             let volBeforeStop = totalRemaining - shiftTrigger;
 
             if (volBeforeStop > 0) {
@@ -399,11 +401,9 @@
                      if (needed <= 0) break;
 
                      if (p.remaining <= needed) {
-                         // Finish this product completely before stop
                          tempVol += p.remaining;
                          timeToStop += p.duration;
                      } else {
-                         // Stop happens inside this product
                          let partialVol = needed;
                          if (p.rate > 0) timeToStop += (partialVol / p.rate);
                          tempVol += partialVol;
@@ -411,11 +411,13 @@
                      }
                  }
 
-                 let stopDate = addMinutes(now, timeToStop * 60);
+                 shiftStopMins = timeToStop * 60; // exact minute relative to start where stop occurs
+
+                 let stopDate = addMinutes(now, shiftStopMins);
                  shiftMsg = `<div class="result-item" style="color: #e65100;"><strong>Arrêt prévu à :</strong> <span>${formatDateTime(stopDate)}</span></div>`;
 
-                 // Add delay to total
-                 totalTimeHours += (shiftDurationMins / 60);
+                 shiftDelayAdded = shiftDurationMins / 60; // in hours
+                 totalTimeHours += shiftDelayAdded;
                  shiftMsg += `<div class="result-item" style="font-size:0.9em; color:#666;">(+ ${shiftDurationMins} min de délai)</div>`;
             }
         }
@@ -432,6 +434,44 @@
 
         let extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée : ${formatDateTime(endDate)}</div>`;
         if (shiftMsg) extraHtml += shiftMsg;
+
+        // --- Detailed Product Schedule ---
+        if (productData.length > 0) {
+             extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:#0097a7;">Séquence de Chargement :</h4>`;
+             let cumulativeTimeMins = 0;
+             let delayAlreadyAdded = false;
+
+             productData.forEach(p => {
+                 let startMins = cumulativeTimeMins;
+                 let durationMins = p.duration * 60;
+                 let endMins = startMins + durationMins;
+
+                 // Check if Shift Stop happens inside this product or right at the end
+                 // Note: If Shift Stop is exactly at endMins, we add delay after this product.
+                 // If Shift Stop is inside, we add delay to this product's finish time.
+
+                 if (shiftStopMins >= 0 && !delayAlreadyAdded) {
+                     // Check overlap
+                     if (shiftStopMins >= startMins && shiftStopMins <= endMins + 0.01) {
+                         // Stop occurs during or at end of this product
+                         cumulativeTimeMins += (document.getElementById('loadShiftDuration').value * 1);
+                         delayAlreadyAdded = true;
+                     }
+                 }
+
+                 cumulativeTimeMins += durationMins;
+                 let pEndDate = addMinutes(now, cumulativeTimeMins);
+
+                 extraHtml += `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em;">
+                        <span>${p.name} (${p.remaining.toFixed(0)} m³)</span>
+                        <span style="font-weight:bold;">Fin : ${formatDateTime(pEndDate)}</span>
+                    </div>
+                `;
+             });
+             extraHtml += `</div>`;
+        }
+
         document.getElementById('loadExtraInfo').innerHTML = extraHtml;
     }
 
