@@ -6,21 +6,64 @@
     <title>Calculateur Maritime Complet</title>
     <style>
         :root {
+            /* Palette Principale (Light) */
             --primary: #006064;
             --secondary: #00363a;
             --accent: #e0f7fa;
             --text: #333;
             --light-text: #fff;
+
+            /* Backgrounds & Surfaces */
+            --bg-body: #f0f4f8;
+            --bg-container: #ffffff;
+            --bg-input: #ffffff;
+            --border-input: #cccccc;
+            --shadow: rgba(0,0,0,0.1);
+
+            /* Specific Elements */
+            --bg-est-box: #fff3e0;
+            --border-est-box: #ffe0b2;
+            --text-est-title: #e65100;
+
+            --orange-btn: #e65100;
+            --orange-btn-hover: #bf360c;
         }
 
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: #f0f4f8; color: var(--text); }
-        header { background: linear-gradient(to right, var(--secondary), var(--primary)); color: var(--light-text); padding: 1rem; text-align: center; }
-        .container { max-width: 800px; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        [data-theme="dark"] {
+            /* Palette Dark Mode */
+            --primary: #1565c0; /* Bleu Foncé requested */
+            --secondary: #0d47a1;
+            --accent: #424242; /* Darker accent for results */
+            --text: #e0e0e0;
+            --light-text: #fff;
+
+            /* Backgrounds & Surfaces */
+            --bg-body: #121212;
+            --bg-container: #1e1e1e;
+            --bg-input: #333333;
+            --border-input: #555555;
+            --shadow: rgba(0,0,0,0.5);
+
+            /* Specific Elements */
+            --bg-est-box: #3e2723;
+            --border-est-box: #5d4037;
+            --text-est-title: #ff9800;
+
+            --orange-btn: #f57c00;
+            --orange-btn-hover: #e65100;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background-color: var(--bg-body); color: var(--text); transition: background-color 0.3s, color 0.3s; }
+        header { background: linear-gradient(to right, var(--secondary), var(--primary)); color: var(--light-text); padding: 1rem; text-align: center; position: relative; }
+        .container { max-width: 800px; margin: 20px auto; background: var(--bg-container); padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px var(--shadow); transition: background-color 0.3s; }
 
         .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
         .tab-btn { flex: 1; padding: 15px; border: none; background: none; cursor: pointer; font-size: 16px; font-weight: bold; color: #666; transition: 0.3s; }
         .tab-btn:hover { background-color: var(--accent); }
         .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+
+        [data-theme="dark"] .tab-btn { color: #aaa; }
+        [data-theme="dark"] .tab-btn.active { color: var(--primary); }
 
         .tab-content { display: none; animation: fadeEffect 0.5s; }
         .tab-content.active { display: block; }
@@ -28,27 +71,56 @@
 
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: 600; }
-        input, select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; box-sizing: border-box; }
+        input, select { width: 100%; padding: 12px; border: 1px solid var(--border-input); border-radius: 4px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-input); color: var(--text); }
 
         /* Style spécial pour la section estimation */
         .estimation-box {
-            background-color: #fff3e0;
-            border: 1px solid #ffe0b2;
+            background-color: var(--bg-est-box);
+            border: 1px solid var(--border-est-box);
             padding: 15px;
             border-radius: 4px;
             margin-bottom: 15px;
         }
-        .estimation-box h3 { margin-top: 0; color: #e65100; font-size: 1em; }
+        .estimation-box h3 { margin-top: 0; color: var(--text-est-title); font-size: 1em; }
 
         button.action-btn { background-color: var(--primary); color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 18px; margin-top: 10px; font-weight: bold; }
         button.action-btn:hover { background-color: var(--secondary); }
-        button.calc-btn { background-color: #e65100; color: white; padding: 8px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; }
-        button.calc-btn:hover { background-color: #bf360c; }
+        button.calc-btn { background-color: var(--orange-btn); color: white; padding: 8px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; }
+        button.calc-btn:hover { background-color: var(--orange-btn-hover); }
 
         .result-box { margin-top: 20px; padding: 20px; background-color: var(--accent); border-radius: 4px; border-left: 6px solid var(--primary); display: none; }
         .result-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 1.1em; }
         .section-title { color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
         .warning { font-size: 0.8em; color: #999; text-align: center; margin-top: 30px; font-style: italic; }
+
+        .theme-toggle {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s;
+        }
+        .theme-toggle:hover { background: rgba(255,255,255,0.3); }
+
+        /* Dynamic Classes for JS/HTML refactoring */
+        .box-light { background-color: #fafafa; border: 1px solid #ddd; }
+        .box-info { background-color: #e0f7fa; border: 1px solid #b2ebf2; }
+        .box-warning { background-color: #fff8e1; border: 1px solid #ffe0b2; }
+        .box-shift { background-color: #e0f2f1; }
+
+        [data-theme="dark"] .box-light { background-color: #2c2c2c; border-color: #444; }
+        [data-theme="dark"] .box-info { background-color: #004d40; border-color: #00695c; }
+        [data-theme="dark"] .box-warning { background-color: #3e2723; border-color: #4e342e; }
+        [data-theme="dark"] .box-shift { background-color: #00332c; }
+
+        .delete-btn { background-color: #e57373; color: white; border: none; border-radius: 3px; padding: 5px; cursor: pointer; font-size: 0.8em; }
+        [data-theme="dark"] .delete-btn { background-color: #c62828; }
     </style>
 </head>
 <body>
@@ -56,6 +128,7 @@
 <header>
     <h1>Calculateur Maritime</h1>
     <p>Estimation Hauteur & Volumes</p>
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙 Mode Sombre</button>
 </header>
 
 <div class="container">
@@ -145,7 +218,7 @@
             <input type="datetime-local" id="loadStartTime">
         </div>
 
-        <div class="form-group" style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #e0f7fa;">
+        <div class="form-group box-info" style="padding: 10px; border-radius: 4px;">
             <label>Séquence de Chargement (Produits) :</label>
             <div id="loadingProductsContainer"></div>
             <div style="display:flex; gap:10px; margin-top:10px;">
@@ -186,7 +259,7 @@
             <input type="number" id="unloadRate">
         </div>
 
-        <div class="form-group" style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; background: #fff8e1;">
+        <div class="form-group box-warning" style="padding: 10px; border-radius: 4px;">
             <label>Séquence Réservoirs à Terre (Optionnel) :</label>
             <div id="shoreTanksContainer"></div>
             <div style="display:flex; gap:10px; margin-top:10px;">
@@ -210,6 +283,27 @@
 </div>
 
 <script>
+    // --- Theme Logic ---
+    function toggleTheme() {
+        const html = document.documentElement;
+        const currentTheme = html.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme);
+        localStorage.setItem('theme', newTheme);
+    }
+
+    function applyTheme(theme) {
+        const html = document.documentElement;
+        const btn = document.getElementById('themeBtn');
+        if (theme === 'dark') {
+            html.setAttribute('data-theme', 'dark');
+            btn.innerText = '☀️ Mode Clair';
+        } else {
+            html.removeAttribute('data-theme');
+            btn.innerText = '🌙 Mode Sombre';
+        }
+    }
+
     // Variables
     let dwt = 0;
     let tanks = 0;
@@ -296,20 +390,18 @@
     function addLoadingProduct() {
         loadProdCount++;
         const div = document.createElement('div');
-        div.className = 'load-prod-row';
+        div.className = 'load-prod-row box-light';
         div.style.display = 'flex';
         div.style.flexDirection = 'column';
         div.style.gap = '5px';
         div.style.marginBottom = '15px';
         div.style.padding = '10px';
-        div.style.border = '1px solid #ddd';
         div.style.borderRadius = '4px';
-        div.style.backgroundColor = '#fafafa';
 
         div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
                 <input type="text" placeholder="Nom du Produit (Ex: Prod A)" class="load-prod-name" style="width:70%;">
-                <button onclick="this.parentElement.parentElement.remove()" style="background:#e57373; color:white; border:none; border-radius:3px; padding:5px; cursor:pointer; font-size:0.8em;">X</button>
+                <button onclick="this.parentElement.parentElement.remove()" class="delete-btn">X</button>
             </div>
 
             <div style="display:flex; gap:5px; margin-bottom:5px;">
@@ -327,7 +419,7 @@
                     <input type="checkbox" class="load-prod-shift-toggle" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
                     Arrêt déplacement pendant ce produit
                 </label>
-                <div class="load-prod-shift-details" style="display:none; gap:5px; background:#e0f2f1; padding:5px; border-radius:3px;">
+                <div class="load-prod-shift-details box-shift" style="display:none; gap:5px; padding:5px; border-radius:3px;">
                      <div style="flex:1;"><label style="font-size:0.8em;">Arrêt si reste (m³)</label><input type="number" class="load-prod-shift-rem" placeholder="Ex: 500"></div>
                      <div style="flex:1;"><label style="font-size:0.8em;">Durée (min)</label><input type="number" class="load-prod-shift-dur" placeholder="Ex: 60"></div>
                 </div>
@@ -365,7 +457,7 @@
         let hasData = false;
 
         if (rows.length > 0) {
-             productScheduleHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:#0097a7;">Séquence de Chargement :</h4>`;
+             productScheduleHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:var(--primary);">Séquence de Chargement :</h4>`;
         }
 
         rows.forEach(row => {
@@ -420,7 +512,7 @@
                      let remainingPumpingMins = pumpingDurationMins - timeToStopMins;
                      cumulativeTimeMins += remainingPumpingMins;
 
-                     shiftMsg = `<div style="font-size:0.9em; color:#e65100; margin-left:10px;">➜ Arrêt dépla. (${shiftDuration}m) à ${formatDateTime(stopDate)}</div>`;
+                     shiftMsg = `<div style="font-size:0.9em; color:var(--orange-btn); margin-left:10px;">➜ Arrêt dépla. (${shiftDuration}m) à ${formatDateTime(stopDate)}</div>`;
                  } else {
                      // Shift trigger not met (already past or equal), just pump
                      cumulativeTimeMins += pumpingDurationMins;
@@ -444,9 +536,9 @@
                             <strong>${name} (${rem.toFixed(0)} m³)</strong>
                             <span>Fin : ${formatDateTime(pEndDate)}</span>
                         </div>
-                        ${samplingEnabled ? `<div style="font-size:0.9em; color:#d84315; margin-left:10px;">➜ Echantillonnage 1m (+45 min)</div>` : ''}
+                        ${samplingEnabled ? `<div style="font-size:0.9em; color:var(--orange-btn); margin-left:10px;">➜ Echantillonnage 1m (+45 min)</div>` : ''}
                         ${shiftMsg}
-                        ${delayAfter > 0 ? `<div style="font-size:0.9em; color:#666; margin-left:10px;">➜ Délai après : ${delayAfter} min</div>` : ''}
+                        ${delayAfter > 0 ? `<div style="font-size:0.9em; color:var(--text); margin-left:10px; opacity:0.8;">➜ Délai après : ${delayAfter} min</div>` : ''}
                     </div>
                 `;
             }
@@ -518,7 +610,7 @@
         let totalDurationMins = 0;
 
         if (hasTanks) {
-            extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:#e65100;">Séquence Réservoirs (avec début lent 30 min max 3000 m³/h) :</h4>`;
+            extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:var(--text-est-title);">Séquence Réservoirs (avec début lent 30 min max 3000 m³/h) :</h4>`;
 
             // Effective slow rate is min(3000, userRate)
             let slowRate = Math.min(3000, rate);
@@ -557,7 +649,7 @@
 
                     extraHtml += `
                         <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em;">
-                            <span>${name} (${qty} m³) ${delay > 0 ? `<i style="font-size:0.8em; color:#666;">(+${delay}m)</i>` : ''}</span>
+                            <span>${name} (${qty} m³) ${delay > 0 ? `<i style="font-size:0.8em; color:var(--text); opacity:0.7;">(+${delay}m)</i>` : ''}</span>
                             <span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>
                         </div>
                     `;
@@ -573,7 +665,7 @@
                  let finalEndTime = addMinutes(now, totalDurationMins);
 
                  extraHtml += `
-                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em; color:#666; font-style:italic;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em; color:var(--text); opacity:0.7; font-style:italic;">
                         <span>Reste non assigné (${unassigned.toFixed(1)} m³)</span>
                         <span>Fin : ${formatDateTime(finalEndTime)}</span>
                     </div>
@@ -621,6 +713,10 @@
     }
 
     // Init
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        applyTheme(savedTheme);
+    }
     addShoreTank();
     addLoadingProduct();
 </script>
