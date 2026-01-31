@@ -138,6 +138,33 @@
 
         .delete-btn { background-color: #e57373; color: white; border: none; border-radius: 3px; padding: 5px; cursor: pointer; font-size: 0.8em; }
         [data-theme="dark"] .delete-btn { background-color: #c62828; }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px auto;
+                padding: 10px;
+                width: 95%;
+            }
+            .tab-btn {
+                padding: 10px 2px;
+                font-size: 14px;
+            }
+            /* Stack input groups vertically */
+            .est-inputs,
+            .load-prod-inputs,
+            .shore-tank-inputs {
+                flex-direction: column !important;
+            }
+            /* Increase touch targets */
+            .delete-btn {
+                padding: 10px;
+                font-size: 1em;
+            }
+            input, select, button {
+                min-height: 44px; /* Better touch target */
+            }
+        }
     </style>
 </head>
 <body>
@@ -182,7 +209,7 @@
         <div class="estimation-box">
             <h3>Calculateur de Hauteur (Optionnel)</h3>
             <p style="font-size:0.9em; margin-bottom:10px;">Si tu ne connais pas la hauteur des tanks, entre les dimensions du navire ci-dessous pour l'estimer à partir du DWT.</p>
-            <div style="display:flex; gap:10px;">
+            <div class="est-inputs" style="display:flex; gap:10px;">
                 <div style="flex:1;">
                     <label>Longueur (LOA) m :</label>
                     <input type="number" id="shipLength" placeholder="Long.">
@@ -421,7 +448,7 @@
                 <button onclick="this.parentElement.parentElement.remove()" class="delete-btn">X</button>
             </div>
 
-            <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <div class="load-prod-inputs" style="display:flex; gap:5px; margin-bottom:5px;">
                 <div style="flex:1;"><label style="font-size:0.8em;">Total (m³)</label><input type="number" class="load-prod-target"></div>
                 <div style="flex:1;"><label style="font-size:0.8em;">À bord (m³)</label><input type="number" class="load-prod-current"></div>
                 <div style="flex:1;"><label style="font-size:0.8em;">Taux (m³/h)</label><input type="number" class="load-prod-rate"></div>
@@ -597,7 +624,7 @@
                 <input type="text" placeholder="Nom (Ex: Tk 1)" class="tank-name" style="width:85%;">
                 <button onclick="this.parentElement.parentElement.remove()" class="delete-btn">X</button>
             </div>
-            <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <div class="shore-tank-inputs" style="display:flex; gap:5px; margin-bottom:5px;">
                 <div style="flex:1;"><label style="font-size:0.8em;">Qté (m³)</label><input type="number" class="tank-qty"></div>
                 <div style="flex:1;"><label style="font-size:0.8em;">Délai Avant (min)</label><input type="number" class="tank-delay"></div>
             </div>
