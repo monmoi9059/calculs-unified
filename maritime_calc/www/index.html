@@ -217,6 +217,7 @@
     <div class="tabs">
         <button class="tab-btn active" onclick="openTab(event, 'config')">Configuration</button>
         <button class="tab-btn" onclick="openTab(event, 'calc1m')">Calcul 1m (m³)</button>
+        <button class="tab-btn" onclick="openTab(event, 'converter')">Convertisseur</button>
         <button class="tab-btn" onclick="openTab(event, 'loading')">Chargement</button>
         <button class="tab-btn" onclick="openTab(event, 'unloading')">Déchargement</button>
     </div>
@@ -291,6 +292,45 @@
                 Volume pour 1m (Navire complet) : <span id="volAllTanks1m">0</span> m³
             </div>
         </div>
+    </div>
+
+    <div id="converter" class="tab-content">
+        <h2 class="section-title">Convertisseur de Volume (54A & 54B)</h2>
+
+        <div class="form-group" id="directionSelect">
+            <label for="conversionDirection">Sens de la conversion :</label>
+            <select id="conversionDirection" onchange="updateLabels()">
+                <option value="toOther">De 15 °C vers une autre température</option>
+                <option value="to15">D'une température quelconque vers 15 °C</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label id="initialVolumeLabel" for="initialVolume">Volume à 15°C (L, m³, etc.) :</label>
+            <input type="number" id="initialVolume" placeholder="Entrez le volume initial" step="any" required>
+        </div>
+
+        <div class="form-group">
+            <label id="temperatureLabel" for="temperature">Température mesurée (°C) :</label>
+            <input type="number" id="temperature" placeholder="Entrez la température actuelle" step="any" required>
+        </div>
+
+        <div class="form-group">
+            <label for="productType">Type de produit :</label>
+            <select id="productType">
+                <option value="brut">Pétrole Brut (Table 54A)</option>
+                <option value="raffiner">Produits Raffinés (Table 54B)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="density15">Densité relative à 15°C (ex: 0.8405) :</label>
+            <input type="number" id="density15" placeholder="Ex: 0.8405" step="0.0001" required>
+        </div>
+
+        <button class="action-btn" onclick="calculateVolume()">Calculer</button>
+
+        <div id="resultConverter" class="result-box"></div>
     </div>
 
     <div id="loading" class="tab-content">
@@ -440,7 +480,10 @@
 
     function saveConfig() {
         dwt = parseFloat(document.getElementById('shipDwt').value) || 0;
-        tanks = parseFloat(document.getElementById('numTanks').value) || 0;
+        tanks = parseFloat(document.getElementById('numTanks').value);
+        if (isNaN(tanks) || tanks === 0) {
+            tanks = 14; // Default to 14 if empty or 0
+        }
         height = parseFloat(document.getElementById('tankHeight').value) || 0;
         density = parseFloat(document.getElementById('density').value) || 1.025;
 
@@ -951,6 +994,100 @@
         return new Date(date.getTime() + minutes * 60000);
     }
 
+    // --- Converter Logic ---
+    const INITIAL_TEMP = 15;
+
+    function updateLabels() {
+        const direction = document.getElementById('conversionDirection').value;
+        const initialVolumeLabel = document.getElementById('initialVolumeLabel');
+        const temperatureLabel = document.getElementById('temperatureLabel');
+
+        if (direction === 'toOther') {
+            initialVolumeLabel.textContent = 'Volume à 15°C (L, m³, etc.) :';
+            temperatureLabel.textContent = 'Température cible (°C) :';
+        } else {
+            initialVolumeLabel.textContent = 'Volume mesuré (L, m³, etc.) :';
+            temperatureLabel.textContent = 'Température mesurée (°C) :';
+        }
+    }
+
+    function calculateVCF(densiteRelative15, temperature, type) {
+        // Convertit la densité relative (ex: 0.850) en densité en kg/m³ (ex: 850)
+        // car les formules ASTM l'exigent.
+        const density_kgm3 = densiteRelative15 * 1000;
+
+        const T_degre = temperature - INITIAL_TEMP; // Ceci est ΔT
+        let vcf;
+
+        if (type === 'brut') {
+            // Table 54A: Pétrole Brut
+            const K0 = 613.9723;
+            const K1 = 0;
+            const K2 = 0;
+            const alpha60 = (K0 + K1 * density_kgm3 + K2 * density_kgm3 * density_kgm3) / (density_kgm3 * density_kgm3);
+            vcf = Math.exp(-alpha60 * T_degre * (1 + 0.8 * alpha60 * T_degre));
+        } else {
+            // Table 54B: Produits Raffinés
+            let K0, K1, K2;
+            if (density_kgm3 <= 770) {
+                 K0 = 346.42278;
+                 K1 = 0.43884;
+                 K2 = 0;
+            } else if (density_kgm3 > 770 && density_kgm3 < 778) {
+                // Cas spécial pour cette plage étroite
+                const A = -0.00033612;
+                const B = 2680.32;
+                const alpha = A + B / (density_kgm3 * density_kgm3);
+                vcf = Math.exp(-alpha * T_degre * (1 + 0.8 * alpha * T_degre));
+                return vcf; // Retourne directement pour ce cas
+            } else if (density_kgm3 >= 778 && density_kgm3 < 839) {
+                K0 = 594.5418;
+                K1 = 0;
+                K2 = 0;
+            } else { // density_kgm3 >= 839
+                K0 = 186.9696;
+                K1 = 0.48618;
+                K2 = 0;
+            }
+            const alpha60 = (K0 + K1 * density_kgm3 + K2 * density_kgm3 * density_kgm3) / (density_kgm3 * density_kgm3);
+            vcf = Math.exp(-alpha60 * T_degre * (1 + 0.8 * alpha60 * T_degre));
+        }
+
+        return vcf;
+    }
+
+    function calculateVolume() {
+        const initialVolume = parseFloat(document.getElementById('initialVolume').value);
+        const temperature = parseFloat(document.getElementById('temperature').value);
+        const density15 = parseFloat(document.getElementById('density15').value);
+        const productType = document.getElementById('productType').value;
+        const direction = document.getElementById('conversionDirection').value;
+
+        if (isNaN(initialVolume) || isNaN(temperature) || isNaN(density15) || initialVolume <= 0 || density15 <= 0) {
+            alert("Veuillez entrer des valeurs numériques valides et positives.");
+            return;
+        }
+
+        const vcf = calculateVCF(density15, temperature, productType);
+
+        let finalVolume;
+        let resultText = '';
+
+        if (direction === 'toOther') {
+            // De 15°C vers T, on divise par le VCF
+            finalVolume = initialVolume / vcf;
+            resultText = `Le volume à ${temperature.toFixed(2)} °C est de <b>${finalVolume.toFixed(2)}</b>.`;
+        } else {
+            // De T vers 15°C, on multiplie par le VCF
+            finalVolume = initialVolume * vcf;
+            resultText = `Le volume corrigé à 15 °C est de <b>${finalVolume.toFixed(2)}</b>.`;
+        }
+
+        const resultDiv = document.getElementById('resultConverter');
+        resultDiv.innerHTML = resultText + `<br><small style="color:var(--text-muted); font-size:0.8em; margin-top:5px; display:block;">(Facteur de correction (VCF) calculé: ${vcf.toFixed(6)})</small>`;
+        resultDiv.style.display = 'block';
+    }
+
     // Init
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
@@ -958,6 +1095,7 @@
     }
     addShoreTank();
     addLoadingProduct();
+    updateLabels();
 </script>
 
     <script src="cordova.js"></script>
