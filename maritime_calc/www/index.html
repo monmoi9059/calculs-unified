@@ -480,7 +480,10 @@
 
     function saveConfig() {
         dwt = parseFloat(document.getElementById('shipDwt').value) || 0;
-        tanks = parseFloat(document.getElementById('numTanks').value) || 0;
+        tanks = parseFloat(document.getElementById('numTanks').value);
+        if (isNaN(tanks) || tanks === 0) {
+            tanks = 14; // Default to 14 if empty or 0
+        }
         height = parseFloat(document.getElementById('tankHeight').value) || 0;
         density = parseFloat(document.getElementById('density').value) || 1.025;
 
