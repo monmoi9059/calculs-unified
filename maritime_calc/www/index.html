@@ -230,20 +230,6 @@
             <input type="number" id="shipDwt" placeholder="Ex: 50000">
         </div>
 
-        <div class="form-group">
-            <label>Type de Produit :</label>
-            <select id="productSelect" onchange="updateDensityFromSelect()">
-                <option value="custom">-- Choisir ou entrer manuellement --</option>
-                <option value="0.740">Essence (Gasoline) - SG 0.740</option>
-                <option value="0.850">Diesel (MDO/MGO) - SG 0.850</option>
-                <option value="0.980">HFO (Fioul Lourd) - SG 0.980</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Densité (SG) :</label>
-            <input type="number" id="density" value="1.025" step="0.001">
-        </div>
 
         <div class="estimation-box">
             <h3>Calculateur de Hauteur (Optionnel)</h3>
@@ -432,11 +418,6 @@
     let height = 0;
     let density = 1.025;
 
-    function updateDensityFromSelect() {
-        const sel = document.getElementById("productSelect").value;
-        if (sel !== "custom") document.getElementById("density").value = sel;
-    }
-
     function openTab(evt, tabName) {
         var i, tabcontent, tablinks;
         tabcontent = document.getElementsByClassName("tab-content");
@@ -451,7 +432,7 @@
     // --- NOUVELLE FONCTION : Estimation de la hauteur ---
     function estimateHeightFromDwt() {
         let d = parseFloat(document.getElementById('shipDwt').value) || 0;
-        let den = parseFloat(document.getElementById('density').value) || 1.025;
+        let den = 1.025;
         let l = parseFloat(document.getElementById('shipLength').value) || 0;
         let w = parseFloat(document.getElementById('shipBeam').value) || 0;
 
@@ -485,7 +466,7 @@
             tanks = 14; // Default to 14 if empty or 0
         }
         height = parseFloat(document.getElementById('tankHeight').value) || 0;
-        density = parseFloat(document.getElementById('density').value) || 1.025;
+        density = 1.025;
 
         document.getElementById('configMsg').style.display = 'block';
         setTimeout(() => { document.getElementById('configMsg').style.display = 'none'; }, 2000);
