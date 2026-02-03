@@ -530,10 +530,16 @@
             </div>
 
             <div style="display:flex; flex-direction:column; gap:5px; padding-top:5px; border-top:1px dashed #ccc;">
-                 <label class="text-warning-custom" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer; margin-bottom:5px;">
-                    <input type="checkbox" class="load-prod-sampling" style="width:auto; margin-right:5px;">
-                    Echantillonnage 1m (+45min)
-                </label>
+                 <div style="margin-bottom:5px;">
+                     <label class="text-warning-custom" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer;">
+                        <input type="checkbox" class="load-prod-sampling" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
+                        Echantillonnage 1m (+45min)
+                    </label>
+                    <div class="load-prod-sampling-inputs" style="display:none; margin-left:25px; margin-top:5px; align-items:center;">
+                        <label style="font-size:0.8em; margin-right:5px;">Nb Réservoirs :</label>
+                        <input type="number" class="load-prod-sampling-tanks" placeholder="Ex: 3" style="width:60px; padding:5px;">
+                    </div>
+                 </div>
                  <label class="text-highlight" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer;">
                     <input type="checkbox" class="load-prod-shift-toggle" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
                     Arrêt déplacement pendant ce produit
@@ -571,6 +577,15 @@
         let extraHtml = "";
         let productScheduleHtml = "";
 
+        // Calculate 1m Volume from Globals (safe check)
+        // ensure density is updated in case it wasn't saved via config button
+        let currentDensity = (typeof density !== 'undefined') ? density : 1.025;
+        let volOneMeter = 0;
+        if (dwt > 0 && tanks > 0 && height > 0) {
+            let totalVol = (dwt / currentDensity) * coeff; // Apply coeff here as well for consistency
+            volOneMeter = (totalVol / tanks) / height;
+        }
+
         // Iterate Products
         const rows = document.querySelectorAll('.load-prod-row');
         let hasData = false;
@@ -597,8 +612,35 @@
 
             // Sampling Logic
             let samplingEnabled = row.querySelector('.load-prod-sampling').checked;
+            let samplingMsg = "";
+            let samplingAddTime = 0;
+
             if (samplingEnabled) {
-                cumulativeTimeMins += 45;
+                samplingAddTime = 45;
+
+                // Calculate "Stop at 1m" time if inputs are valid
+                let nbTanks = parseFloat(row.querySelector('.load-prod-sampling-tanks').value) || 0;
+
+                if (nbTanks > 0 && volOneMeter > 0 && r > 0) {
+                    let totalStopVol = volOneMeter * nbTanks;
+                    let volBeforeStop = rem - totalStopVol;
+
+                    if (volBeforeStop > 0) {
+                         // Time to pump until 1m remains
+                         let timeToStopMins = (volBeforeStop / r) * 60;
+                         // The absolute time is: Start of Product + timeToStopMins
+                         // We need the start time of THIS product.
+                         // cumulativeTimeMins currently holds the END of the PREVIOUS product (or start of this one).
+                         let stopDate = addMinutes(now, cumulativeTimeMins + timeToStopMins);
+
+                         samplingMsg = `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Arrêt Échantillon (1m) à ${formatDateTime(stopDate)} (Reste ${totalStopVol.toFixed(1)} m³)</div>`;
+                    } else {
+                         samplingMsg = `<div class="text-danger" style="font-size:0.9em; margin-left:10px;">➜ Impossible de calculer arrêt (Volume < 1m)</div>`;
+                    }
+                } else if (samplingEnabled) {
+                     // Basic message if detailed calc not possible
+                     samplingMsg = `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Echantillonnage 1m (+45 min)</div>`;
+                }
             }
 
             // Shift Logic for this product
@@ -640,6 +682,12 @@
                  cumulativeTimeMins += pumpingDurationMins;
             }
 
+            // Add Sampling Time (done after pumping, or conceptually interspersed, but simplified to adding to total here)
+            // It might be better to add it *before* delay after.
+            if (samplingAddTime > 0) {
+                cumulativeTimeMins += samplingAddTime;
+            }
+
             // Add Delay After
             if (delayAfter > 0) {
                 cumulativeTimeMins += delayAfter;
@@ -655,7 +703,7 @@
                             <strong>${name} (${rem.toFixed(0)} m³)</strong>
                             <span>Fin : ${formatDateTime(pEndDate)}</span>
                         </div>
-                        ${samplingEnabled ? `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Echantillonnage 1m (+45 min)</div>` : ''}
+                        ${samplingMsg ? samplingMsg : ''}
                         ${shiftMsg}
                         ${delayAfter > 0 ? `<div class="text-muted" style="font-size:0.9em; margin-left:10px;">➜ Délai après : ${delayAfter} min</div>` : ''}
                     </div>
