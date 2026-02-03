@@ -253,6 +253,12 @@
         </div>
 
         <div class="form-group">
+            <label>Coefficient de Remplissage (%) :</label>
+            <input type="number" id="fillCoeff" value="71" placeholder="Ex: 85">
+            <small style="color:var(--text-muted); font-size:0.8em;">Ajustement pour la structure interne (Cadres, pompes, forme...)</small>
+        </div>
+
+        <div class="form-group">
             <label>Nombre de compartiments (Tanks) :</label>
             <input type="number" id="numTanks" placeholder="Ex: 10">
         </div>
@@ -417,6 +423,7 @@
     let tanks = 0;
     let height = 0;
     let density = 1.025;
+    let coeff = 0.71;
 
     function openTab(evt, tabName) {
         var i, tabcontent, tablinks;
@@ -466,6 +473,8 @@
             tanks = 14; // Default to 14 if empty or 0
         }
         height = parseFloat(document.getElementById('tankHeight').value) || 0;
+        let c = parseFloat(document.getElementById('fillCoeff').value);
+        coeff = (isNaN(c) ? 71 : c) / 100;
         density = 1.025;
 
         document.getElementById('configMsg').style.display = 'block';
@@ -479,11 +488,16 @@
             return;
         }
 
-        let totalVolumeCapacity = dwt / density;
-        let volumePerTank = totalVolumeCapacity / tanks;
+        // Volume Théorique (Boîte parfaite de densité 1.025)
+        let theoreticalVolume = dwt / density;
+
+        // Volume Réel Estimé (Avec coefficient de forme/structure)
+        let adjustedVolume = theoreticalVolume * coeff;
+
+        let volumePerTank = adjustedVolume / tanks;
         let volumePerMeter = volumePerTank / height;
 
-        document.getElementById('totalVol').innerText = totalVolumeCapacity.toFixed(1);
+        document.getElementById('totalVol').innerText = adjustedVolume.toFixed(1);
         document.getElementById('usedHeight').innerText = height.toFixed(2);
         document.getElementById('volOneTank1m').innerText = volumePerMeter.toFixed(2);
         document.getElementById('volAllTanks1m').innerText = (volumePerMeter * tanks).toFixed(2);
