@@ -28,15 +28,24 @@
 
             --orange-btn: #e65100;
             --orange-btn-hover: #bf360c;
+
+            /* Status Colors (Light) */
+            --text-success: #3c763d;
+            --bg-success: #dff0d8;
+            --border-success: #3c763d;
+
+            --text-highlight: #006064;
+            --text-warning-custom: #d84315;
+            --text-muted: #757575;
         }
 
         [data-theme="dark"] {
             /* Palette Dark Mode */
-            --primary: #1565c0; /* Bleu Foncé requested */
-            --secondary: #0d47a1;
+            --primary: #64b5f6; /* Lighter Blue for better contrast on dark */
+            --secondary: #1e88e5;
             --accent: #424242; /* Darker accent for results */
             --text: #e0e0e0;
-            --light-text: #fff;
+            --light-text: #121212; /* Dark text on light blue headers */
 
             /* Backgrounds & Surfaces */
             --bg-body: #121212;
@@ -48,10 +57,19 @@
             /* Specific Elements */
             --bg-est-box: #3e2723;
             --border-est-box: #5d4037;
-            --text-est-title: #ff9800;
+            --text-est-title: #ffb74d;
 
-            --orange-btn: #f57c00;
-            --orange-btn-hover: #e65100;
+            --orange-btn: #ff9800;
+            --orange-btn-hover: #fb8c00;
+
+            /* Status Colors (Dark) */
+            --text-success: #a5d6a7;
+            --bg-success: #1b5e20;
+            --border-success: #2e7d32;
+
+            --text-highlight: #80deea;
+            --text-warning-custom: #ffcc80;
+            --text-muted: #bdbdbd;
         }
 
         body {
@@ -131,14 +149,33 @@
         .box-info { background-color: #e0f7fa; border: 1px solid #b2ebf2; }
         .box-warning { background-color: #fff8e1; border: 1px solid #ffe0b2; }
         .box-shift { background-color: #e0f2f1; }
+        .box-success { background-color: var(--bg-success); border: 1px solid var(--border-success); color: var(--text-success); }
 
         [data-theme="dark"] .box-light { background-color: #2c2c2c; border-color: #444; }
         [data-theme="dark"] .box-info { background-color: #004d40; border-color: #00695c; }
         [data-theme="dark"] .box-warning { background-color: #3e2723; border-color: #4e342e; }
         [data-theme="dark"] .box-shift { background-color: #00332c; }
 
+        .text-highlight { color: var(--text-highlight); }
+        .text-warning-custom { color: var(--text-warning-custom); }
+        .text-muted { color: var(--text-muted); }
+        .text-primary { color: var(--primary); }
+        .text-orange { color: var(--orange-btn); }
+        .text-est-title { color: var(--text-est-title); }
+        .text-danger { color: #d32f2f; }
+        [data-theme="dark"] .text-danger { color: #ef9a9a; }
+
+        /* Input Placeholders */
+        ::placeholder { color: #888; opacity: 1; }
+        [data-theme="dark"] ::placeholder { color: #bbb; }
+        [data-theme="dark"] input, [data-theme="dark"] select { color: #fff; }
+
         .delete-btn { background-color: #e57373; color: white; border: none; border-radius: 3px; padding: 5px; cursor: pointer; font-size: 0.8em; }
         [data-theme="dark"] .delete-btn { background-color: #c62828; }
+
+        /* Bypass Checkbox Visibility Logic */
+        .tank-bypass-start { display: none; }
+        #shoreTanksContainer .shore-tank-row:first-child .tank-bypass-start { display: block; }
 
         /* Mobile Responsiveness */
         @media (max-width: 600px) {
@@ -171,8 +208,8 @@
 <body>
 
 <header>
-    <h1>Calculateur Maritime</h1>
-    <p>Estimation Hauteur & Volumes</p>
+    <h1>Calculateur du père Langlois</h1>
+    <p>Il y a trois sortes de mathématiciens : ceux qui savent compter et ceux qui ne savent pas. Benjamin Doreca</p>
     <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙 Mode Sombre</button>
 </header>
 
@@ -180,6 +217,7 @@
     <div class="tabs">
         <button class="tab-btn active" onclick="openTab(event, 'config')">Configuration</button>
         <button class="tab-btn" onclick="openTab(event, 'calc1m')">Calcul 1m (m³)</button>
+        <button class="tab-btn" onclick="openTab(event, 'converter')">Convertisseur</button>
         <button class="tab-btn" onclick="openTab(event, 'loading')">Chargement</button>
         <button class="tab-btn" onclick="openTab(event, 'unloading')">Déchargement</button>
     </div>
@@ -192,20 +230,6 @@
             <input type="number" id="shipDwt" placeholder="Ex: 50000">
         </div>
 
-        <div class="form-group">
-            <label>Type de Produit :</label>
-            <select id="productSelect" onchange="updateDensityFromSelect()">
-                <option value="custom">-- Choisir ou entrer manuellement --</option>
-                <option value="0.740">Essence (Gasoline) - SG 0.740</option>
-                <option value="0.850">Diesel (MDO/MGO) - SG 0.850</option>
-                <option value="0.980">HFO (Fioul Lourd) - SG 0.980</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>Densité (SG) :</label>
-            <input type="number" id="density" value="1.025" step="0.001">
-        </div>
 
         <div class="estimation-box">
             <h3>Calculateur de Hauteur (Optionnel)</h3>
@@ -229,12 +253,18 @@
         </div>
 
         <div class="form-group">
+            <label>Coefficient de Remplissage (%) :</label>
+            <input type="number" id="fillCoeff" value="98" placeholder="Ex: 98">
+            <small style="color:var(--text-muted); font-size:0.8em;">Ajustement pour la structure interne (Cadres, pompes, forme...)</small>
+        </div>
+
+        <div class="form-group">
             <label>Nombre de compartiments (Tanks) :</label>
             <input type="number" id="numTanks" placeholder="Ex: 10">
         </div>
 
         <button class="action-btn" onclick="saveConfig()">Sauvegarder Configuration</button>
-        <div id="configMsg" class="result-box" style="background-color: #dff0d8; border-color: #3c763d; color: #3c763d; text-align: center;">
+        <div id="configMsg" class="result-box box-success" style="text-align: center;">
             Configuration sauvegardée !
         </div>
     </div>
@@ -247,13 +277,52 @@
             <div class="result-item"><strong>Volume Total Navire :</strong> <span><span id="totalVol">0</span> m³</span></div>
             <div class="result-item"><strong>Hauteur utilisée :</strong> <span><span id="usedHeight">0</span> m</span></div>
             <hr>
-            <div class="result-item" style="color: #006064; font-weight: bold; font-size: 1.2em;">
+            <div class="result-item text-highlight" style="font-weight: bold; font-size: 1.2em;">
                 Volume pour 1m (1 tank) : <span id="volOneTank1m">0</span> m³
             </div>
             <div class="result-item">
                 Volume pour 1m (Navire complet) : <span id="volAllTanks1m">0</span> m³
             </div>
         </div>
+    </div>
+
+    <div id="converter" class="tab-content">
+        <h2 class="section-title">Convertisseur de Volume (54A & 54B)</h2>
+
+        <div class="form-group" id="directionSelect">
+            <label for="conversionDirection">Sens de la conversion :</label>
+            <select id="conversionDirection" onchange="updateLabels()">
+                <option value="toOther">De 15 °C vers une autre température</option>
+                <option value="to15">D'une température quelconque vers 15 °C</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label id="initialVolumeLabel" for="initialVolume">Volume à 15°C (L, m³, etc.) :</label>
+            <input type="number" id="initialVolume" placeholder="Entrez le volume initial" step="any" required>
+        </div>
+
+        <div class="form-group">
+            <label id="temperatureLabel" for="temperature">Température mesurée (°C) :</label>
+            <input type="number" id="temperature" placeholder="Entrez la température actuelle" step="any" required>
+        </div>
+
+        <div class="form-group">
+            <label for="productType">Type de produit :</label>
+            <select id="productType">
+                <option value="brut">Pétrole Brut (Table 54A)</option>
+                <option value="raffiner">Produits Raffinés (Table 54B)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="density15">Densité relative à 15°C (ex: 0.8405) :</label>
+            <input type="number" id="density15" placeholder="Ex: 0.8405" step="0.0001" required>
+        </div>
+
+        <button class="action-btn" onclick="calculateVolume()">Calculer</button>
+
+        <div id="resultConverter" class="result-box"></div>
     </div>
 
     <div id="loading" class="tab-content">
@@ -354,11 +423,7 @@
     let tanks = 0;
     let height = 0;
     let density = 1.025;
-
-    function updateDensityFromSelect() {
-        const sel = document.getElementById("productSelect").value;
-        if (sel !== "custom") document.getElementById("density").value = sel;
-    }
+    let coeff = 0.98;
 
     function openTab(evt, tabName) {
         var i, tabcontent, tablinks;
@@ -374,7 +439,7 @@
     // --- NOUVELLE FONCTION : Estimation de la hauteur ---
     function estimateHeightFromDwt() {
         let d = parseFloat(document.getElementById('shipDwt').value) || 0;
-        let den = parseFloat(document.getElementById('density').value) || 1.025;
+        let den = 1.025;
         let l = parseFloat(document.getElementById('shipLength').value) || 0;
         let w = parseFloat(document.getElementById('shipBeam').value) || 0;
 
@@ -391,21 +456,25 @@
 
         // 3. Calcul de la Hauteur théorique
         // Formule : Hauteur = Volume / (Surface * Coefficient de Remplissage)
-        // On utilise un coefficient de 0.85 (Block Coefficient moyen pour tankers)
-        // car le navire n'est pas une boîte carrée parfaite.
-        let estimatedHeight = totalVolume / (area * 0.85);
+        // On utilise un coefficient de 0.43 pour ajuster l'estimation (empirique)
+        let estimatedHeight = totalVolume / (area * 0.43);
 
         // Mise à jour du champ
         document.getElementById('tankHeight').value = estimatedHeight.toFixed(2);
 
-        alert("Hauteur estimée à " + estimatedHeight.toFixed(2) + " mètres (basée sur un coefficient de coque de 0.85).");
+        alert("Hauteur estimée à " + estimatedHeight.toFixed(2) + " mètres (basée sur un coefficient de coque de 0.43).");
     }
 
     function saveConfig() {
         dwt = parseFloat(document.getElementById('shipDwt').value) || 0;
-        tanks = parseFloat(document.getElementById('numTanks').value) || 0;
+        tanks = parseFloat(document.getElementById('numTanks').value);
+        if (isNaN(tanks) || tanks === 0) {
+            tanks = 14; // Default to 14 if empty or 0
+        }
         height = parseFloat(document.getElementById('tankHeight').value) || 0;
-        density = parseFloat(document.getElementById('density').value) || 1.025;
+        let c = parseFloat(document.getElementById('fillCoeff').value);
+        coeff = (isNaN(c) ? 98 : c) / 100;
+        density = 1.025;
 
         document.getElementById('configMsg').style.display = 'block';
         setTimeout(() => { document.getElementById('configMsg').style.display = 'none'; }, 2000);
@@ -418,11 +487,16 @@
             return;
         }
 
-        let totalVolumeCapacity = dwt / density;
-        let volumePerTank = totalVolumeCapacity / tanks;
+        // Volume Théorique (Boîte parfaite de densité 1.025)
+        let theoreticalVolume = dwt / density;
+
+        // Volume Réel Estimé (Avec coefficient de forme/structure)
+        let adjustedVolume = theoreticalVolume * coeff;
+
+        let volumePerTank = adjustedVolume / tanks;
         let volumePerMeter = volumePerTank / height;
 
-        document.getElementById('totalVol').innerText = totalVolumeCapacity.toFixed(1);
+        document.getElementById('totalVol').innerText = adjustedVolume.toFixed(1);
         document.getElementById('usedHeight').innerText = height.toFixed(2);
         document.getElementById('volOneTank1m').innerText = volumePerMeter.toFixed(2);
         document.getElementById('volAllTanks1m').innerText = (volumePerMeter * tanks).toFixed(2);
@@ -456,11 +530,11 @@
             </div>
 
             <div style="display:flex; flex-direction:column; gap:5px; padding-top:5px; border-top:1px dashed #ccc;">
-                 <label style="display:flex; align-items:center; font-size:0.9em; color:#d84315; cursor:pointer; margin-bottom:5px;">
+                 <label class="text-warning-custom" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer; margin-bottom:5px;">
                     <input type="checkbox" class="load-prod-sampling" style="width:auto; margin-right:5px;">
                     Echantillonnage 1m (+45min)
                 </label>
-                 <label style="display:flex; align-items:center; font-size:0.9em; color:#006064; cursor:pointer;">
+                 <label class="text-highlight" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer;">
                     <input type="checkbox" class="load-prod-shift-toggle" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
                     Arrêt déplacement pendant ce produit
                 </label>
@@ -502,7 +576,7 @@
         let hasData = false;
 
         if (rows.length > 0) {
-             productScheduleHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:var(--primary);">Séquence de Chargement :</h4>`;
+             productScheduleHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 class="text-primary" style="margin:0 0 10px 0;">Séquence de Chargement :</h4>`;
         }
 
         rows.forEach(row => {
@@ -557,7 +631,7 @@
                      let remainingPumpingMins = pumpingDurationMins - timeToStopMins;
                      cumulativeTimeMins += remainingPumpingMins;
 
-                     shiftMsg = `<div style="font-size:0.9em; color:var(--orange-btn); margin-left:10px;">➜ Arrêt dépla. (${shiftDuration}m) à ${formatDateTime(stopDate)}</div>`;
+                     shiftMsg = `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Arrêt dépla. (${shiftDuration}m) à ${formatDateTime(stopDate)}</div>`;
                  } else {
                      // Shift trigger not met (already past or equal), just pump
                      cumulativeTimeMins += pumpingDurationMins;
@@ -581,9 +655,9 @@
                             <strong>${name} (${rem.toFixed(0)} m³)</strong>
                             <span>Fin : ${formatDateTime(pEndDate)}</span>
                         </div>
-                        ${samplingEnabled ? `<div style="font-size:0.9em; color:var(--orange-btn); margin-left:10px;">➜ Echantillonnage 1m (+45 min)</div>` : ''}
+                        ${samplingEnabled ? `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Echantillonnage 1m (+45 min)</div>` : ''}
                         ${shiftMsg}
-                        ${delayAfter > 0 ? `<div style="font-size:0.9em; color:var(--text); margin-left:10px; opacity:0.8;">➜ Délai après : ${delayAfter} min</div>` : ''}
+                        ${delayAfter > 0 ? `<div class="text-muted" style="font-size:0.9em; margin-left:10px;">➜ Délai après : ${delayAfter} min</div>` : ''}
                     </div>
                 `;
             }
@@ -604,7 +678,7 @@
         document.getElementById('loadTime').innerText = h + "h " + m + "m";
         document.getElementById('resultLoad').style.display = 'block';
 
-        extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée : ${formatDateTime(endDate)}</div>`;
+        extraHtml = `<div class="result-item text-primary" style="margin-top:10px; font-weight:bold;">Fin estimée : ${formatDateTime(endDate)}</div>`;
         extraHtml += productScheduleHtml;
 
         document.getElementById('loadExtraInfo').innerHTML = extraHtml;
@@ -631,7 +705,14 @@
             </div>
 
             <div style="border-top:1px dashed #ccc; padding-top:5px; margin-top:5px;">
-                <label style="display:flex; align-items:center; font-size:0.9em; color:var(--orange-btn); cursor:pointer;">
+                <div class="tank-bypass-start" style="margin-bottom: 5px;">
+                     <label class="text-warning-custom" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer;">
+                        <input type="checkbox" class="tank-bypass-check" style="width:auto; margin-right:5px;">
+                        Bypass 30m Démarrage
+                    </label>
+                </div>
+
+                <label class="text-orange" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer;">
                     <input type="checkbox" class="tank-slow-toggle" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
                     Ajouter Ralentissement
                 </label>
@@ -656,7 +737,7 @@
         let rate = parseFloat(document.getElementById('unloadRate').value) || 0;
         if (rate === 0) return;
 
-        let current = start - discharged; // Remaining
+        let current = start - discharged; // Remaining to pump globally
         if (current < 0) current = 0;
 
         let startTimeVal = document.getElementById('unloadStartTime').value;
@@ -670,16 +751,47 @@
         tankRows.forEach(row => { if(row.querySelector('.tank-qty').value) hasTanks = true; });
 
         let totalDurationMins = 0;
+        let remainingDischargedForCalc = discharged; // Volume "already done" to distribute
+        let totalRemainingCapacityInTanks = 0; // To track unassigned
 
         if (hasTanks) {
-            extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 style="margin:0 0 10px 0; color:var(--text-est-title);">Séquence Réservoirs :</h4>`;
+            extraHtml += `<div style="margin-top:15px; padding-top:10px; border-top:1px solid #ddd;"><h4 class="text-est-title" style="margin:0 0 10px 0;">Séquence Réservoirs :</h4>`;
 
-            let totalTankQty = 0;
+            // Pre-calculation: Auto-fill last tank if needed
+            let sumOtherTanks = 0;
+            let lastTankIndex = tankRows.length - 1;
+
+            // Calculate sum of all valid quantities EXCEPT the last one if it's empty/0
+            for(let i=0; i<tankRows.length; i++) {
+                let q = parseFloat(tankRows[i].querySelector('.tank-qty').value) || 0;
+                if (i !== lastTankIndex || q > 0) {
+                    sumOtherTanks += q;
+                }
+            }
 
             tankRows.forEach((row, index) => {
                 let name = row.querySelector('.tank-name').value || `Réservoir ${index + 1}`;
-                let qty = parseFloat(row.querySelector('.tank-qty').value) || 0;
+                let qtyInput = parseFloat(row.querySelector('.tank-qty').value) || 0;
                 let delay = parseFloat(row.querySelector('.tank-delay').value) || 0;
+
+                let qty = qtyInput;
+                let isAutoCalc = false;
+
+                // Auto-calc logic for last tank
+                if (index === lastTankIndex && qtyInput === 0) {
+                    let remainder = current - sumOtherTanks; // current is remaining to pump globally
+                    // Wait, 'current' is (Start - Discharged).
+                    // We need to base the auto-fill on the TOTAL Start volume vs Other Tanks capacity.
+                    // If user says "Start 5000", Tank1=2000. Then Tank2 should be 3000.
+                    // Regardless of how much is discharged.
+                    let totalStart = parseFloat(document.getElementById('unloadStart').value) || 0;
+                    let autoVal = totalStart - sumOtherTanks;
+
+                    if (autoVal > 0) {
+                        qty = autoVal;
+                        isAutoCalc = true;
+                    }
+                }
 
                 // Slowdown inputs
                 let slowRateInput = parseFloat(row.querySelector('.tank-slow-rate').value) || 0;
@@ -687,99 +799,167 @@
                 let useSlowdown = row.querySelector('.tank-slow-toggle').checked && slowRateInput > 0 && slowDurInput > 0;
 
                 if (qty > 0) {
-                    totalTankQty += qty;
-
-                    // Add User Delay first
-                    totalDurationMins += delay;
-
-                    // Calculate Duration for this tank
-                    let tankDurationMins = 0;
-                    let remainingQty = qty;
-                    let msgs = [];
-
-                    // --- Phase 1: Standard Slow Start (30 min @ Max 3000 m³/h) ---
-                    let startDur = 30;
-                    // Limité à 3000 m³/h, ou le taux normal si inférieur
-                    let startRate = (rate > 3000) ? 3000 : rate;
-                    let startVol = startRate * (startDur / 60);
-
-                    if (remainingQty <= startVol) {
-                        let time = (remainingQty / startRate) * 60;
-                        tankDurationMins += time;
-                        msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage : ${time.toFixed(1)}m (Fin du tank)</div>`);
-                        remainingQty = 0;
+                    // Determine how much of this tank is already filled
+                    let filledAlready = 0;
+                    if (remainingDischargedForCalc >= qty) {
+                        filledAlready = qty;
+                        remainingDischargedForCalc -= qty;
                     } else {
-                        tankDurationMins += startDur;
-                        remainingQty -= startVol;
-                        msgs.push(`<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Démarrage standard : 30m @ ${startRate.toFixed(0)} m³/h</div>`);
+                        filledAlready = remainingDischargedForCalc;
+                        remainingDischargedForCalc = 0;
                     }
 
-                    // --- Phase 2: Manual Slowdown ---
-                    if (remainingQty > 0 && useSlowdown) {
-                        let volDuringSlow = slowRateInput * (slowDurInput / 60);
+                    let remainingInTank = qty - filledAlready;
+                    totalRemainingCapacityInTanks += remainingInTank;
 
-                        if (remainingQty <= volDuringSlow) {
-                            let time = (remainingQty / slowRateInput) * 60;
-                            tankDurationMins += time;
-                            msgs.push(`<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti Manuel : ${time.toFixed(1)}m (Fin du tank)</div>`);
-                            remainingQty = 0;
+                    let tankDurationMins = 0;
+                    let msgs = [];
+                    let tankStatus = "";
+                    let tankClass = ""; // For styling
+
+                    if (remainingInTank <= 0) {
+                         tankStatus = `<span class="text-muted" style="font-weight:bold;">(Terminé)</span>`;
+                         tankClass = "opacity: 0.5;";
+                    } else {
+                        // Tank is active or future
+                        let isPartial = (filledAlready > 0);
+
+                        // 1. Delay
+                        // Skip delay if partially filled (active)
+                        if (!isPartial) {
+                             totalDurationMins += delay;
+                             if (delay > 0) msgs.push(`<div class="text-muted" style="font-size:0.85em; margin-left:10px;">➜ Délai avant : ${delay} min</div>`);
                         } else {
-                            tankDurationMins += slowDurInput;
-                            remainingQty -= volDuringSlow;
-                            msgs.push(`<div style="font-size:0.85em; color:var(--orange-btn); margin-left:10px;">➜ Ralenti Manuel : ${slowDurInput}m @ ${slowRateInput} m³/h</div>`);
+                             if (delay > 0) msgs.push(`<div class="text-muted" style="font-size:0.85em; text-decoration:line-through; margin-left:10px;">➜ Délai (Déjà passé)</div>`);
                         }
+
+                        // We have 'remainingInTank' to pump.
+                        // We need to see which phases are left.
+                        // We simulate the phases with volumes.
+
+                        let volDone = filledAlready; // The volume we have already traversed in the phases
+
+                        // --- Phase 1: Slow Start ---
+                        let bypassCheck = row.querySelector('.tank-bypass-check');
+                        let isBypass = (index === 0 && bypassCheck && bypassCheck.checked);
+                        let phase1Vol = 0;
+                        let phase1Rate = 0;
+                        let phase1Dur = 0;
+
+                        if (!isBypass) {
+                            phase1Dur = 30;
+                            phase1Rate = (rate > 3000) ? 3000 : rate;
+                            phase1Vol = phase1Rate * (phase1Dur / 60);
+                        }
+
+                        // Process Phase 1
+                        if (phase1Vol > 0) {
+                             if (volDone >= phase1Vol) {
+                                 // Phase 1 fully done
+                                 volDone -= phase1Vol;
+                                 msgs.push(`<div class="text-muted" style="font-size:0.85em; margin-left:10px;">➜ Démarrage (Terminé)</div>`);
+                             } else {
+                                 // Phase 1 partially or not done
+                                 let effectivePhase1Vol = Math.min(phase1Vol, qty); // Cap phase 1 by total tank size
+                                 let workLeftInPhase1 = effectivePhase1Vol - volDone;
+
+                                 // If workLeftInPhase1 > remainingInTank, clamp it.
+                                 if (workLeftInPhase1 > remainingInTank) workLeftInPhase1 = remainingInTank;
+
+                                 if (workLeftInPhase1 > 0) {
+                                     let time = (workLeftInPhase1 / phase1Rate) * 60;
+                                     tankDurationMins += time;
+                                     remainingInTank -= workLeftInPhase1;
+                                     msgs.push(`<div class="text-muted" style="font-size:0.85em; margin-left:10px;">➜ Démarrage (Reste) : ${time.toFixed(1)}m @ ${phase1Rate.toFixed(0)}</div>`);
+                                 }
+
+                                 // We have consumed the 'volDone' for Phase 1 context.
+                                 volDone = 0;
+                             }
+                        }
+
+                        // --- Phase 2: Manual Slowdown ---
+                        if (remainingInTank > 0 && useSlowdown) {
+                            let phase2Vol = slowRateInput * (slowDurInput / 60);
+
+                            if (volDone >= phase2Vol) {
+                                // Phase 2 fully done
+                                volDone -= phase2Vol;
+                                msgs.push(`<div class="text-muted" style="font-size:0.85em; margin-left:10px;">➜ Ralenti (Terminé)</div>`);
+                            } else {
+                                // We are in Phase 2 or at start of it
+                                let workLeftInPhase2 = phase2Vol - volDone;
+                                if (workLeftInPhase2 > remainingInTank) workLeftInPhase2 = remainingInTank;
+
+                                if (workLeftInPhase2 > 0) {
+                                    let time = (workLeftInPhase2 / slowRateInput) * 60;
+                                    tankDurationMins += time;
+                                    remainingInTank -= workLeftInPhase2;
+                                     msgs.push(`<div class="text-orange" style="font-size:0.85em; margin-left:10px;">➜ Ralenti (Reste) : ${time.toFixed(1)}m @ ${slowRateInput}</div>`);
+                                }
+                                volDone = 0;
+                            }
+                        }
+
+                        // --- Phase 3: Normal ---
+                        if (remainingInTank > 0) {
+                             let time = (remainingInTank / rate) * 60;
+                             tankDurationMins += time;
+                             remainingInTank = 0;
+                        }
+
+                        totalDurationMins += tankDurationMins;
                     }
 
-                    // --- Phase 3: Normal Rate ---
-                    if (remainingQty > 0) {
-                        let timeNormal = (remainingQty / rate) * 60;
-                        tankDurationMins += timeNormal;
-                    }
-
-                    totalDurationMins += tankDurationMins;
                     let tankEndTime = addMinutes(now, totalDurationMins);
 
                     extraHtml += `
-                        <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
+                        <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px; ${tankClass}">
                             <div style="display:flex; justify-content:space-between; font-size:1em;">
-                                <span>${name} (${qty} m³)</span>
-                                <span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>
+                                <span>${name} (${qty} m³${isAutoCalc ? '*' : ''}) ${tankStatus}</span>
+                                ${tankStatus !== "" ?
+                                    `<span>-</span>` :
+                                    `<span style="font-weight:bold;">Fin : ${formatDateTime(tankEndTime)}</span>`
+                                }
                             </div>
-                            ${delay > 0 ? `<div style="font-size:0.85em; color:var(--text); opacity:0.8; margin-left:10px;">➜ Délai avant : ${delay} min</div>` : ''}
                             ${msgs.join('')}
+                            ${isAutoCalc ? `<div class="text-primary" style="font-size:0.8em; font-style:italic;">* Calculé automatiquement (Reste)</div>` : ''}
                         </div>
                     `;
                 }
             });
 
-            // Check for unassigned remaining volume
-            let unassigned = current - totalTankQty;
-            if (unassigned > 0.01) { // small epsilon
+            // Unassigned
+            // current is (Start - Discharged).
+            // totalRemainingCapacityInTanks is sum(Tank - Filled).
+            // unassigned = current - totalRemainingCapacityInTanks.
+            let unassigned = current - totalRemainingCapacityInTanks;
+
+             if (unassigned > 0.01) {
                  let unassignedHours = unassigned / rate;
                  let unassignedMins = unassignedHours * 60;
                  totalDurationMins += unassignedMins;
                  let finalEndTime = addMinutes(now, totalDurationMins);
 
                  extraHtml += `
-                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em; color:var(--text); opacity:0.7; font-style:italic;">
+                    <div class="text-muted" style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.95em; font-style:italic;">
                         <span>Reste non assigné (${unassigned.toFixed(1)} m³)</span>
                         <span>Fin : ${formatDateTime(finalEndTime)}</span>
                     </div>
                 `;
             } else if (unassigned < -0.01) {
-                 extraHtml += `<div style="color:red; font-size:0.9em;">Attention: La somme des réservoirs (${totalTankQty} m³) dépasse le reste à pomper !</div>`;
+                 extraHtml += `<div class="text-danger" style="font-size:0.9em;">Attention: La somme restante des réservoirs (${totalRemainingCapacityInTanks} m³) dépasse le reste à pomper (${current} m³) !</div>`;
             }
 
             let finalDate = addMinutes(now, totalDurationMins);
-            extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée (Ajustée) : ${formatDateTime(finalDate)}</div>` + extraHtml;
+            extraHtml = `<div class="result-item text-primary" style="margin-top:10px; font-weight:bold;">Fin estimée (Ajustée) : ${formatDateTime(finalDate)}</div>` + extraHtml;
             extraHtml += `</div>`;
-
         } else {
              // Fallback for simple calculation without tanks list
              let timeHours = current / rate;
              totalDurationMins = timeHours * 60;
              let endDate = addMinutes(now, totalDurationMins);
-             extraHtml = `<div class="result-item" style="margin-top:10px; font-weight:bold; color:var(--primary);">Fin estimée (Simple) : ${formatDateTime(endDate)}</div>`;
+             extraHtml = `<div class="result-item text-primary" style="margin-top:10px; font-weight:bold;">Fin estimée (Simple) : ${formatDateTime(endDate)}</div>`;
         }
 
         let h = Math.floor(totalDurationMins / 60);
@@ -808,6 +988,100 @@
         return new Date(date.getTime() + minutes * 60000);
     }
 
+    // --- Converter Logic ---
+    const INITIAL_TEMP = 15;
+
+    function updateLabels() {
+        const direction = document.getElementById('conversionDirection').value;
+        const initialVolumeLabel = document.getElementById('initialVolumeLabel');
+        const temperatureLabel = document.getElementById('temperatureLabel');
+
+        if (direction === 'toOther') {
+            initialVolumeLabel.textContent = 'Volume à 15°C (L, m³, etc.) :';
+            temperatureLabel.textContent = 'Température cible (°C) :';
+        } else {
+            initialVolumeLabel.textContent = 'Volume mesuré (L, m³, etc.) :';
+            temperatureLabel.textContent = 'Température mesurée (°C) :';
+        }
+    }
+
+    function calculateVCF(densiteRelative15, temperature, type) {
+        // Convertit la densité relative (ex: 0.850) en densité en kg/m³ (ex: 850)
+        // car les formules ASTM l'exigent.
+        const density_kgm3 = densiteRelative15 * 1000;
+
+        const T_degre = temperature - INITIAL_TEMP; // Ceci est ΔT
+        let vcf;
+
+        if (type === 'brut') {
+            // Table 54A: Pétrole Brut
+            const K0 = 613.9723;
+            const K1 = 0;
+            const K2 = 0;
+            const alpha60 = (K0 + K1 * density_kgm3 + K2 * density_kgm3 * density_kgm3) / (density_kgm3 * density_kgm3);
+            vcf = Math.exp(-alpha60 * T_degre * (1 + 0.8 * alpha60 * T_degre));
+        } else {
+            // Table 54B: Produits Raffinés
+            let K0, K1, K2;
+            if (density_kgm3 <= 770) {
+                 K0 = 346.42278;
+                 K1 = 0.43884;
+                 K2 = 0;
+            } else if (density_kgm3 > 770 && density_kgm3 < 778) {
+                // Cas spécial pour cette plage étroite
+                const A = -0.00033612;
+                const B = 2680.32;
+                const alpha = A + B / (density_kgm3 * density_kgm3);
+                vcf = Math.exp(-alpha * T_degre * (1 + 0.8 * alpha * T_degre));
+                return vcf; // Retourne directement pour ce cas
+            } else if (density_kgm3 >= 778 && density_kgm3 < 839) {
+                K0 = 594.5418;
+                K1 = 0;
+                K2 = 0;
+            } else { // density_kgm3 >= 839
+                K0 = 186.9696;
+                K1 = 0.48618;
+                K2 = 0;
+            }
+            const alpha60 = (K0 + K1 * density_kgm3 + K2 * density_kgm3 * density_kgm3) / (density_kgm3 * density_kgm3);
+            vcf = Math.exp(-alpha60 * T_degre * (1 + 0.8 * alpha60 * T_degre));
+        }
+
+        return vcf;
+    }
+
+    function calculateVolume() {
+        const initialVolume = parseFloat(document.getElementById('initialVolume').value);
+        const temperature = parseFloat(document.getElementById('temperature').value);
+        const density15 = parseFloat(document.getElementById('density15').value);
+        const productType = document.getElementById('productType').value;
+        const direction = document.getElementById('conversionDirection').value;
+
+        if (isNaN(initialVolume) || isNaN(temperature) || isNaN(density15) || initialVolume <= 0 || density15 <= 0) {
+            alert("Veuillez entrer des valeurs numériques valides et positives.");
+            return;
+        }
+
+        const vcf = calculateVCF(density15, temperature, productType);
+
+        let finalVolume;
+        let resultText = '';
+
+        if (direction === 'toOther') {
+            // De 15°C vers T, on divise par le VCF
+            finalVolume = initialVolume / vcf;
+            resultText = `Le volume à ${temperature.toFixed(2)} °C est de <b>${finalVolume.toFixed(2)}</b>.`;
+        } else {
+            // De T vers 15°C, on multiplie par le VCF
+            finalVolume = initialVolume * vcf;
+            resultText = `Le volume corrigé à 15 °C est de <b>${finalVolume.toFixed(2)}</b>.`;
+        }
+
+        const resultDiv = document.getElementById('resultConverter');
+        resultDiv.innerHTML = resultText + `<br><small style="color:var(--text-muted); font-size:0.8em; margin-top:5px; display:block;">(Facteur de correction (VCF) calculé: ${vcf.toFixed(6)})</small>`;
+        resultDiv.style.display = 'block';
+    }
+
     // Init
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
@@ -815,6 +1089,7 @@
     }
     addShoreTank();
     addLoadingProduct();
+    updateLabels();
 </script>
 
     <script src="cordova.js"></script>
