@@ -254,7 +254,7 @@
 
         <div class="form-group">
             <label>Coefficient de Remplissage (%) :</label>
-            <input type="number" id="fillCoeff" value="71" placeholder="Ex: 85">
+            <input type="number" id="fillCoeff" value="98" placeholder="Ex: 98">
             <small style="color:var(--text-muted); font-size:0.8em;">Ajustement pour la structure interne (Cadres, pompes, forme...)</small>
         </div>
 
@@ -423,7 +423,7 @@
     let tanks = 0;
     let height = 0;
     let density = 1.025;
-    let coeff = 0.71;
+    let coeff = 0.98;
 
     function openTab(evt, tabName) {
         var i, tabcontent, tablinks;
@@ -456,14 +456,13 @@
 
         // 3. Calcul de la Hauteur théorique
         // Formule : Hauteur = Volume / (Surface * Coefficient de Remplissage)
-        // On utilise un coefficient de 0.85 (Block Coefficient moyen pour tankers)
-        // car le navire n'est pas une boîte carrée parfaite.
-        let estimatedHeight = totalVolume / (area * 0.85);
+        // On utilise un coefficient de 0.55 pour ajuster l'estimation (empirique)
+        let estimatedHeight = totalVolume / (area * 0.55);
 
         // Mise à jour du champ
         document.getElementById('tankHeight').value = estimatedHeight.toFixed(2);
 
-        alert("Hauteur estimée à " + estimatedHeight.toFixed(2) + " mètres (basée sur un coefficient de coque de 0.85).");
+        alert("Hauteur estimée à " + estimatedHeight.toFixed(2) + " mètres (basée sur un coefficient de coque de 0.55).");
     }
 
     function saveConfig() {
@@ -474,7 +473,7 @@
         }
         height = parseFloat(document.getElementById('tankHeight').value) || 0;
         let c = parseFloat(document.getElementById('fillCoeff').value);
-        coeff = (isNaN(c) ? 71 : c) / 100;
+        coeff = (isNaN(c) ? 98 : c) / 100;
         density = 1.025;
 
         document.getElementById('configMsg').style.display = 'block';
