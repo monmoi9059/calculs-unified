@@ -456,13 +456,13 @@
 
         // 3. Calcul de la Hauteur théorique
         // Formule : Hauteur = Volume / (Surface * Coefficient de Remplissage)
-        // On utilise un coefficient de 0.55 pour ajuster l'estimation (empirique)
-        let estimatedHeight = totalVolume / (area * 0.55);
+        // On utilise un coefficient de 0.43 pour ajuster l'estimation (empirique)
+        let estimatedHeight = totalVolume / (area * 0.43);
 
         // Mise à jour du champ
         document.getElementById('tankHeight').value = estimatedHeight.toFixed(2);
 
-        alert("Hauteur estimée à " + estimatedHeight.toFixed(2) + " mètres (basée sur un coefficient de coque de 0.55).");
+        alert("Hauteur estimée à " + estimatedHeight.toFixed(2) + " mètres (basée sur un coefficient de coque de 0.43).");
     }
 
     function saveConfig() {
