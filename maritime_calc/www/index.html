@@ -623,19 +623,39 @@
 
                 if (nbTanks > 0 && volOneMeter > 0 && r > 0) {
                     let totalStopVol = volOneMeter * nbTanks;
-                    let volBeforeStop = rem - totalStopVol;
 
-                    if (volBeforeStop > 0) {
-                         // Time to pump until 1m remains
-                         let timeToStopMins = (volBeforeStop / r) * 60;
-                         // The absolute time is: Start of Product + timeToStopMins
-                         // We need the start time of THIS product.
-                         // cumulativeTimeMins currently holds the END of the PREVIOUS product (or start of this one).
-                         let stopDate = addMinutes(now, cumulativeTimeMins + timeToStopMins);
+                    // Logic Update: Stop when volume ON BOARD is totalStopVol (1m level)
+                    // Volume to pump = Target 1m Volume - Current Volume On Board
+                    // If current volume is already > 1m volume, it means we passed it or it's irrelevant.
+                    // Assuming we start from 'c' (current on board).
 
-                         samplingMsg = `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Arrêt Échantillon (1m) à ${formatDateTime(stopDate)} (Reste ${totalStopVol.toFixed(1)} m³)</div>`;
+                    let volToPumpForStop = totalStopVol - c;
+
+                    if (volToPumpForStop > 0) {
+                         // Time to pump until we reach 1m level
+                         let timeToStopMins = (volToPumpForStop / r) * 60;
+
+                         // Check if this stop happens BEFORE the end of this product loading
+                         // We are loading 'rem' amount. If volToPumpForStop > rem, it means we won't reach 1m in this session?
+                         // No, 'rem' = Target - Current.
+                         // 'totalStopVol' is the absolute volume for 1m.
+                         // If totalStopVol > Target, then we never reach 1m? (Wait, 1m is at the bottom).
+                         // If totalStopVol < Target, we will pass it.
+                         // But we only pump if current < totalStopVol.
+
+                         if (volToPumpForStop < rem) {
+                             let stopDate = addMinutes(now, cumulativeTimeMins + timeToStopMins);
+                             samplingMsg = `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Arrêt à 1m de bord à ${formatDateTime(stopDate)} (Vol. à bord: ${totalStopVol.toFixed(1)} m³)</div>`;
+                         } else {
+                             // This implies the target volume is LESS than 1m level?
+                             // Or we just finish loading before hitting the "stop" condition if interpreted differently?
+                             // If we need to load 1000, and 1m is at 200. We pump 200.
+                             // If we need to load 100, and 1m is at 200. We finish at 100 (0.5m). We never stop at 1m.
+                             samplingMsg = `<div class="text-danger" style="font-size:0.9em; margin-left:10px;">➜ Cible atteinte avant 1m (${totalStopVol.toFixed(1)} m³)</div>`;
+                         }
                     } else {
-                         samplingMsg = `<div class="text-danger" style="font-size:0.9em; margin-left:10px;">➜ Impossible de calculer arrêt (Volume < 1m)</div>`;
+                         // We are already above 1m
+                         samplingMsg = `<div class="text-muted" style="font-size:0.9em; margin-left:10px;">➜ Niveau 1m déjà dépassé</div>`;
                     }
                 } else if (samplingEnabled) {
                      // Basic message if detailed calc not possible
