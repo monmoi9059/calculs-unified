@@ -595,10 +595,19 @@
             </div>
 
             <div style="display:flex; flex-direction:column; gap:5px; padding-top:5px; border-top:1px dashed #ccc;">
-                 <label class="text-warning-custom" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer; margin-bottom:5px;">
-                    <input type="checkbox" class="load-prod-sampling" style="width:auto; margin-right:5px;">
-                    Echantillonnage 1m (+45min)
-                </label>
+                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <label class="text-warning-custom" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer;">
+                        <input type="checkbox" class="load-prod-sampling" style="width:auto; margin-right:5px;">
+                        Echantillonnage 1m (+45min)
+                    </label>
+                    <input type="number" class="load-prod-tanks" placeholder="Nb Tanks" style="width:80px; font-size:0.8em; padding:5px;">
+                 </div>
+                 <div class="load-prod-no-stop-wrapper" style="display:flex; align-items:center; margin-bottom:5px; margin-left:25px;">
+                    <label class="text-muted" style="display:flex; align-items:center; font-size:0.85em; cursor:pointer;">
+                        <input type="checkbox" class="load-prod-no-stop" style="width:auto; margin-right:5px;">
+                        Pas d'arrêt (Détection seulement)
+                    </label>
+                 </div>
                  <label class="text-highlight" style="display:flex; align-items:center; font-size:0.9em; cursor:pointer;">
                     <input type="checkbox" class="load-prod-shift-toggle" style="width:auto; margin-right:5px;" onchange="this.parentElement.nextElementSibling.style.display = this.checked ? 'flex' : 'none'">
                     Arrêt déplacement pendant ce produit
@@ -625,7 +634,18 @@
     }
 
     function calculateLoading(btn) {
+        saveConfig(); // Ensure global vars are fresh
         const calculator = btn.closest('.loading-calculator');
+
+        // Calculate Volume per 1m per Tank
+        // This relies on calculateOneMeter logic
+        let volumePerTank1m = 0;
+        if (dwt > 0 && tanks > 0 && height > 0) {
+            let theoreticalVolume = dwt / density;
+            let adjustedVolume = theoreticalVolume * coeff;
+            let volumePerTank = adjustedVolume / tanks;
+            volumePerTank1m = volumePerTank / height;
+        }
 
         let totalTarget = 0;
         let totalCurrent = 0;
@@ -638,6 +658,7 @@
         let cumulativeTimeMins = 0;
         let extraHtml = "";
         let productScheduleHtml = "";
+        let voiceAnnouncements = [];
 
         // Iterate Products
         const rows = calculator.querySelectorAll('.load-prod-row');
@@ -657,32 +678,70 @@
             let rem = t - c;
             if (rem < 0) rem = 0;
 
+            // Track current remaining volume for this product as we simulate phases
+            let currentProductRem = rem;
+
             totalTarget += t;
             totalCurrent += c;
             totalRemaining += rem;
 
             if (t > 0 || r > 0) hasData = true;
 
-            // Sampling Logic
+            // 1m Sampling Phase (HAPPENS FIRST)
             let samplingEnabled = row.querySelector('.load-prod-sampling').checked;
-            if (samplingEnabled) {
-                cumulativeTimeMins += 45;
+            let nbTanksProd = parseFloat(row.querySelector('.load-prod-tanks').value) || 0;
+            let noStop = row.querySelector('.load-prod-no-stop').checked;
+            let volFor1m = 0;
+
+            if (samplingEnabled && nbTanksProd > 0 && volumePerTank1m > 0 && r > 0) {
+                // Calculate volume required to reach 1m in specified tanks
+                volFor1m = volumePerTank1m * nbTanksProd;
+
+                // Ensure we don't exceed remaining product
+                if (volFor1m > currentProductRem) volFor1m = currentProductRem;
+
+                // Time to pump this 1m volume
+                let timeTo1mMins = (volFor1m / r) * 60;
+
+                cumulativeTimeMins += timeTo1mMins;
+                let samplingDate = addMinutes(now, cumulativeTimeMins);
+
+                let voiceMsg = `Arrêt échantillonnage 1 mètre ${formatDateForSpeech(samplingDate)}`;
+                if (noStop) {
+                    voiceMsg = `Passage à 1 mètre ${formatDateForSpeech(samplingDate)}`;
+                }
+                voiceAnnouncements.push(voiceMsg);
+
+                // Add 45 min stop ONLY if noStop is unchecked
+                if (!noStop) {
+                    cumulativeTimeMins += 45;
+                }
+
+                // Update remaining volume to avoid double counting pumping time
+                currentProductRem -= volFor1m;
+            } else if (samplingEnabled) {
+                // Fallback if no tanks specified: Just add 45 mins at start if not suppressed
+                if (!noStop) {
+                    cumulativeTimeMins += 45;
+                }
             }
 
             // Shift Logic for this product
             let shiftEnabled = row.querySelector('.load-prod-shift-toggle').checked;
             let shiftDuration = 0;
             let shiftMsg = "";
-            let pumpingDurationHours = (r > 0) ? (rem / r) : 0;
+
+            // Calculate remaining pumping duration based on UPDATED remaining volume
+            let pumpingDurationHours = (r > 0) ? (currentProductRem / r) : 0;
             let pumpingDurationMins = pumpingDurationHours * 60;
 
-            if (shiftEnabled && rem > 0 && r > 0) {
+            if (shiftEnabled && currentProductRem > 0 && r > 0) {
                  let shiftTrigger = parseFloat(row.querySelector('.load-prod-shift-rem').value) || 0;
                  let shiftDurInput = parseFloat(row.querySelector('.load-prod-shift-dur').value) || 0;
 
                  // Logic: Stop when 'shiftTrigger' remains FOR THIS PRODUCT.
-                 // So we pump (rem - shiftTrigger).
-                 let volBeforeStop = rem - shiftTrigger;
+                 // We need to pump (currentProductRem - shiftTrigger).
+                 let volBeforeStop = currentProductRem - shiftTrigger;
 
                  if (volBeforeStop > 0) {
                      let timeToStopMins = (volBeforeStop / r) * 60;
@@ -691,6 +750,8 @@
                      // Add pre-stop pumping time
                      cumulativeTimeMins += timeToStopMins;
                      let stopDate = addMinutes(now, cumulativeTimeMins);
+
+                     voiceAnnouncements.push(`Arrêt déplacement ${formatDateForSpeech(stopDate)}`);
 
                      // Add Shift Duration
                      cumulativeTimeMins += shiftDuration;
@@ -741,7 +802,14 @@
         let m = Math.round((totalTimeHours - h) * 60);
         let endDate = addMinutes(now, totalTimeHours * 60);
 
-        speakAnnouncement('chargement', endDate);
+        // Construct final voice message
+        let finalVoiceMsg = "";
+        if (voiceAnnouncements.length > 0) {
+            finalVoiceMsg += voiceAnnouncements.join(". ") + ". ";
+        }
+        finalVoiceMsg += `Le chargement se terminera ${formatDateForSpeech(endDate)}.`;
+
+        speakAnnouncement(finalVoiceMsg);
 
         calculator.querySelector('.load-remaining').innerText = totalRemaining.toFixed(1);
         calculator.querySelector('.load-percent').innerText = percent.toFixed(1);
@@ -1036,7 +1104,7 @@
         let m = Math.round(totalDurationMins % 60);
         let finalEndDate = addMinutes(now, totalDurationMins);
 
-        speakAnnouncement('déchargement', finalEndDate);
+        speakAnnouncement(`Le déchargement se terminera ${formatDateForSpeech(finalEndDate)}.`);
 
         document.getElementById('unloadDone').innerText = discharged.toFixed(1);
         document.getElementById('unloadRemaining').innerText = current.toFixed(1);
@@ -1062,9 +1130,20 @@
     }
 
     // --- Voice Announcement Logic ---
-    function speakAnnouncement(operationName, date) {
+    function speakAnnouncement(text) {
         if (!voiceEnabled) return;
 
+        // Cancel any current speech to avoid queue buildup
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'fr-FR';
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    function formatDateForSpeech(date) {
         const d = new Date(date);
         const day = d.getDate();
         const month = d.toLocaleString('fr-FR', { month: 'long' });
@@ -1075,17 +1154,7 @@
         if (minutes > 0) {
             dateString += ` ${minutes}`;
         }
-
-        const sentence = `Le ${operationName} se terminera ${dateString}.`;
-
-        // Cancel any current speech to avoid queue buildup
-        if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(sentence);
-            utterance.lang = 'fr-FR';
-            utterance.rate = 1.0;
-            window.speechSynthesis.speak(utterance);
-        }
+        return dateString;
     }
 
     // --- Converter Logic ---
