@@ -692,6 +692,7 @@
             let nbTanksProd = parseFloat(row.querySelector('.load-prod-tanks').value) || 0;
             let noStop = row.querySelector('.load-prod-no-stop').checked;
             let volFor1m = 0;
+            let samplingDate = null;
 
             if (samplingEnabled && nbTanksProd > 0 && volumePerTank1m > 0 && r > 0) {
                 // Calculate volume required to reach 1m in specified tanks
@@ -704,7 +705,7 @@
                 let timeTo1mMins = (volFor1m / r) * 60;
 
                 cumulativeTimeMins += timeTo1mMins;
-                let samplingDate = addMinutes(now, cumulativeTimeMins);
+                samplingDate = addMinutes(now, cumulativeTimeMins);
 
                 let voiceMsg = `Arrêt échantillonnage 1 mètre sur ${name} ${formatDateForSpeech(samplingDate)}`;
                 if (noStop) {
@@ -720,6 +721,9 @@
                 // Update remaining volume to avoid double counting pumping time
                 currentProductRem -= volFor1m;
             } else if (samplingEnabled) {
+                // Fallback if no tanks specified: Just use current cumulative time (start of product)
+                samplingDate = addMinutes(now, cumulativeTimeMins);
+
                 // Fallback if no tanks specified: Just add 45 mins at start if not suppressed
                 if (!noStop) {
                     cumulativeTimeMins += 45;
@@ -778,13 +782,24 @@
             let pEndDate = addMinutes(now, cumulativeTimeMins);
 
             if (rem > 0 || delayAfter > 0 || samplingEnabled) {
+                let samplingInfo = '';
+                if (samplingEnabled) {
+                    const d = samplingDate ? samplingDate : new Date(pEndDate);
+                    const hhmm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+                    if (noStop) {
+                         samplingInfo = `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Passage 1m à ${hhmm} (Pas d'arrêt)</div>`;
+                    } else {
+                         samplingInfo = `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Arrêt 1m à ${hhmm} (+45 min)</div>`;
+                    }
+                }
+
                 productScheduleHtml += `
                     <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
                         <div style="display:flex; justify-content:space-between; font-size:1em;">
                             <strong>${name} (${rem.toFixed(0)} m³)</strong>
                             <span>Fin : ${formatDateTime(pEndDate)}</span>
                         </div>
-                        ${samplingEnabled ? `<div class="text-orange" style="font-size:0.9em; margin-left:10px;">➜ Echantillonnage 1m (+45 min)</div>` : ''}
+                        ${samplingInfo}
                         ${shiftMsg}
                         ${delayAfter > 0 ? `<div class="text-muted" style="font-size:0.9em; margin-left:10px;">➜ Délai après : ${delayAfter} min</div>` : ''}
                     </div>
