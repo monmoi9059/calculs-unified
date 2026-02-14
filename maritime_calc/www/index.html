@@ -177,6 +177,21 @@
         .tank-bypass-start { display: none; }
         #shoreTanksContainer .shore-tank-row:first-child .tank-bypass-start { display: block; }
 
+        /* Loading Calculator Instance Style */
+        .loading-calculator {
+            flex: 1 1 300px;
+            background: var(--bg-container);
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            position: relative;
+        }
+        [data-theme="dark"] .loading-calculator {
+            border-color: #555;
+            background: #2c2c2c;
+        }
+
         /* Mobile Responsiveness */
         @media (max-width: 600px) {
             .container {
@@ -327,30 +342,9 @@
 
     <div id="loading" class="tab-content">
         <h2 class="section-title">Chargement (m³)</h2>
-        <div class="form-group">
-            <label>Date/Heure de début (Optionnel - Par défaut : Maintenant) :</label>
-            <input type="datetime-local" id="loadStartTime">
-        </div>
-
-        <div class="form-group box-info" style="padding: 10px; border-radius: 4px;">
-            <label>Séquence de Chargement (Produits) :</label>
-            <div id="loadingProductsContainer"></div>
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <button class="calc-btn" onclick="addLoadingProduct()" style="flex:1; background-color:#0097a7;">+ Ajouter Produit</button>
-                <button class="calc-btn" onclick="resetLoadingProducts()" style="flex:1; background-color:#757575;">Réinitialiser</button>
-            </div>
-        </div>
-
-        <button class="action-btn" onclick="calculateLoading()">Calculer Chargement</button>
-
-        <div id="resultLoad" class="result-box">
-            <div class="result-item"><strong>Reste à charger :</strong> <span><span id="loadRemaining">0</span> m³</span></div>
-            <div class="result-item"><strong>Pourcentage :</strong> <span id="loadPercent">0</span> %</div>
-            <hr>
-            <div class="result-item" style="font-size: 1.3em; font-weight: bold;">
-                Temps restant : <span id="loadTime">0h 00m</span>
-            </div>
-            <div id="loadExtraInfo" style="margin-top:15px; border-top: 1px dashed #bbb; padding-top:10px;"></div>
+        <button class="action-btn" onclick="addNewLoadingCalculator()" style="margin-bottom: 20px; background-color: var(--primary);">+ Ajouter un Calculateur</button>
+        <div id="loading-calculators-wrapper" style="display: flex; flex-wrap: wrap; gap: 20px;">
+            <!-- Calculators will be added here dynamically -->
         </div>
     </div>
 
@@ -504,10 +498,69 @@
         document.getElementById('result1m').style.display = 'block';
     }
 
-    // --- Loading Multiple Products Logic ---
-    let loadProdCount = 0;
-    function addLoadingProduct() {
-        loadProdCount++;
+    // --- Loading Multiple Products Logic (Refactored for Multiple Instances) ---
+
+    function addNewLoadingCalculator() {
+        const wrapper = document.getElementById('loading-calculators-wrapper');
+        const div = document.createElement('div');
+        div.className = 'loading-calculator';
+
+        // Close/Remove Button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'delete-btn';
+        closeBtn.innerText = 'X';
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.top = '10px';
+        closeBtn.style.right = '10px';
+        // Only allow removing if it's not the only one? Or just allow user freedom.
+        // Let's allow removing any.
+        closeBtn.onclick = function() {
+            if (confirm("Supprimer ce calculateur ?")) {
+                div.remove();
+            }
+        };
+        div.appendChild(closeBtn);
+
+        const content = `
+            <h3 style="margin-top:0; padding-right:30px; font-size:1.1em;">Calculateur de Chargement</h3>
+            <div class="form-group">
+                <label>Date/Heure de début :</label>
+                <input type="datetime-local" class="load-startTime">
+            </div>
+
+            <div class="form-group box-info" style="padding: 10px; border-radius: 4px;">
+                <label>Séquence de Chargement :</label>
+                <div class="loading-products-container"></div>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button class="calc-btn" onclick="addLoadingProduct(this)" style="flex:1; background-color:#0097a7;">+ Produit</button>
+                    <button class="calc-btn" onclick="resetLoadingProducts(this)" style="flex:1; background-color:#757575;">Réinit.</button>
+                </div>
+            </div>
+
+            <button class="action-btn" onclick="calculateLoading(this)">Calculer</button>
+
+            <div class="result-box result-load">
+                <div class="result-item"><strong>Reste :</strong> <span><span class="load-remaining">0</span> m³</span></div>
+                <div class="result-item"><strong>% :</strong> <span class="load-percent">0</span> %</div>
+                <hr>
+                <div class="result-item" style="font-size: 1.3em; font-weight: bold;">
+                    Temps : <span class="load-time">0h 00m</span>
+                </div>
+                <div class="load-extra-info" style="margin-top:15px; border-top: 1px dashed #bbb; padding-top:10px;"></div>
+            </div>
+        `;
+        div.insertAdjacentHTML('beforeend', content);
+        wrapper.appendChild(div);
+
+        // Add initial product row
+        const addBtn = div.querySelector('.calc-btn'); // Finds the "+ Produit" button
+        addLoadingProduct(addBtn);
+    }
+
+    function addLoadingProduct(btn) {
+        const calculator = btn.closest('.loading-calculator');
+        const container = calculator.querySelector('.loading-products-container');
+
         const div = document.createElement('div');
         div.className = 'load-prod-row box-light';
         div.style.display = 'flex';
@@ -549,22 +602,25 @@
                 <input type="number" class="load-prod-delay-after" placeholder="Ex: 30">
             </div>
         `;
-        document.getElementById('loadingProductsContainer').appendChild(div);
+        container.appendChild(div);
     }
 
-    function resetLoadingProducts() {
-        document.getElementById('loadingProductsContainer').innerHTML = '';
-        loadProdCount = 0;
-        addLoadingProduct();
+    function resetLoadingProducts(btn) {
+        const calculator = btn.closest('.loading-calculator');
+        const container = calculator.querySelector('.loading-products-container');
+        container.innerHTML = '';
+        addLoadingProduct(btn); // Add one empty row back
     }
 
-    function calculateLoading() {
+    function calculateLoading(btn) {
+        const calculator = btn.closest('.loading-calculator');
+
         let totalTarget = 0;
         let totalCurrent = 0;
         let totalRemaining = 0;
         let totalTimeHours = 0;
 
-        let startTimeVal = document.getElementById('loadStartTime').value;
+        let startTimeVal = calculator.querySelector('.load-startTime').value;
         let now = startTimeVal ? new Date(startTimeVal) : new Date();
 
         let cumulativeTimeMins = 0;
@@ -572,7 +628,7 @@
         let productScheduleHtml = "";
 
         // Iterate Products
-        const rows = document.querySelectorAll('.load-prod-row');
+        const rows = calculator.querySelectorAll('.load-prod-row');
         let hasData = false;
 
         if (rows.length > 0) {
@@ -673,15 +729,15 @@
         let m = Math.round((totalTimeHours - h) * 60);
         let endDate = addMinutes(now, totalTimeHours * 60);
 
-        document.getElementById('loadRemaining').innerText = totalRemaining.toFixed(1);
-        document.getElementById('loadPercent').innerText = percent.toFixed(1);
-        document.getElementById('loadTime').innerText = h + "h " + m + "m";
-        document.getElementById('resultLoad').style.display = 'block';
+        calculator.querySelector('.load-remaining').innerText = totalRemaining.toFixed(1);
+        calculator.querySelector('.load-percent').innerText = percent.toFixed(1);
+        calculator.querySelector('.load-time').innerText = h + "h " + m + "m";
+        calculator.querySelector('.result-load').style.display = 'block';
 
         extraHtml = `<div class="result-item text-primary" style="margin-top:10px; font-weight:bold;">Fin estimée : ${formatDateTime(endDate)}</div>`;
         extraHtml += productScheduleHtml;
 
-        document.getElementById('loadExtraInfo').innerHTML = extraHtml;
+        calculator.querySelector('.load-extra-info').innerHTML = extraHtml;
     }
 
     // --- Unloading Logic with Multiple Tanks ---
@@ -1088,7 +1144,7 @@
         applyTheme(savedTheme);
     }
     addShoreTank();
-    addLoadingProduct();
+    addNewLoadingCalculator();
     updateLabels();
 </script>
 
