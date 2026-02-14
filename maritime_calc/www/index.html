@@ -278,6 +278,14 @@
             <input type="number" id="numTanks" placeholder="Ex: 10">
         </div>
 
+        <div class="form-group" style="margin-top:20px; border-top:1px solid #ddd; padding-top:10px;">
+             <label class="text-highlight" style="display:flex; align-items:center; cursor:pointer; font-size:1.1em;">
+                <input type="checkbox" id="voiceToggle" style="width:auto; margin-right:10px; transform: scale(1.2);">
+                Activer les annonces vocales
+            </label>
+            <small style="color:var(--text-muted); display:block; margin-top:5px; margin-left:30px;">Annonce la date et l'heure de fin des opérations.</small>
+        </div>
+
         <button class="action-btn" onclick="saveConfig()">Sauvegarder Configuration</button>
         <div id="configMsg" class="result-box box-success" style="text-align: center;">
             Configuration sauvegardée !
@@ -418,6 +426,7 @@
     let height = 0;
     let density = 1.025;
     let coeff = 0.98;
+    let voiceEnabled = false;
 
     function openTab(evt, tabName) {
         var i, tabcontent, tablinks;
@@ -469,6 +478,9 @@
         let c = parseFloat(document.getElementById('fillCoeff').value);
         coeff = (isNaN(c) ? 98 : c) / 100;
         density = 1.025;
+
+        voiceEnabled = document.getElementById('voiceToggle').checked;
+        localStorage.setItem('voiceEnabled', voiceEnabled);
 
         document.getElementById('configMsg').style.display = 'block';
         setTimeout(() => { document.getElementById('configMsg').style.display = 'none'; }, 2000);
@@ -728,6 +740,8 @@
         let h = Math.floor(totalTimeHours);
         let m = Math.round((totalTimeHours - h) * 60);
         let endDate = addMinutes(now, totalTimeHours * 60);
+
+        speakAnnouncement('chargement', endDate);
 
         calculator.querySelector('.load-remaining').innerText = totalRemaining.toFixed(1);
         calculator.querySelector('.load-percent').innerText = percent.toFixed(1);
@@ -1020,6 +1034,9 @@
 
         let h = Math.floor(totalDurationMins / 60);
         let m = Math.round(totalDurationMins % 60);
+        let finalEndDate = addMinutes(now, totalDurationMins);
+
+        speakAnnouncement('déchargement', finalEndDate);
 
         document.getElementById('unloadDone').innerText = discharged.toFixed(1);
         document.getElementById('unloadRemaining').innerText = current.toFixed(1);
@@ -1042,6 +1059,33 @@
 
     function addMinutes(date, minutes) {
         return new Date(date.getTime() + minutes * 60000);
+    }
+
+    // --- Voice Announcement Logic ---
+    function speakAnnouncement(operationName, date) {
+        if (!voiceEnabled) return;
+
+        const d = new Date(date);
+        const day = d.getDate();
+        const month = d.toLocaleString('fr-FR', { month: 'long' });
+        const hours = d.getHours();
+        const minutes = d.getMinutes();
+
+        let dateString = `le ${day} ${month} à ${hours} heures`;
+        if (minutes > 0) {
+            dateString += ` ${minutes}`;
+        }
+
+        const sentence = `Le ${operationName} se terminera ${dateString}.`;
+
+        // Cancel any current speech to avoid queue buildup
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(sentence);
+            utterance.lang = 'fr-FR';
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
     }
 
     // --- Converter Logic ---
@@ -1143,6 +1187,13 @@
     if (savedTheme) {
         applyTheme(savedTheme);
     }
+
+    const savedVoice = localStorage.getItem('voiceEnabled');
+    if (savedVoice === 'true') {
+        voiceEnabled = true;
+        document.getElementById('voiceToggle').checked = true;
+    }
+
     addShoreTank();
     addNewLoadingCalculator();
     updateLabels();
