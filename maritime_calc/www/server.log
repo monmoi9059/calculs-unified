@@ -1,0 +1,9 @@
+127.0.0.1 - - [14/Feb/2026 03:46:54] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [14/Feb/2026 03:46:54] code 404, message File not found
+127.0.0.1 - - [14/Feb/2026 03:46:54] "GET /cordova.js HTTP/1.1" 404 -
+127.0.0.1 - - [14/Feb/2026 03:47:45] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [14/Feb/2026 03:47:45] code 404, message File not found
+127.0.0.1 - - [14/Feb/2026 03:47:45] "GET /cordova.js HTTP/1.1" 404 -
+127.0.0.1 - - [14/Feb/2026 03:48:10] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [14/Feb/2026 03:48:10] code 404, message File not found
+127.0.0.1 - - [14/Feb/2026 03:48:10] "GET /cordova.js HTTP/1.1" 404 -
