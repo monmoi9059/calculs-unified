@@ -706,9 +706,9 @@
                 cumulativeTimeMins += timeTo1mMins;
                 let samplingDate = addMinutes(now, cumulativeTimeMins);
 
-                let voiceMsg = `Arrêt échantillonnage 1 mètre ${formatDateForSpeech(samplingDate)}`;
+                let voiceMsg = `Arrêt échantillonnage 1 mètre sur ${name} ${formatDateForSpeech(samplingDate)}`;
                 if (noStop) {
-                    voiceMsg = `Passage à 1 mètre ${formatDateForSpeech(samplingDate)}`;
+                    voiceMsg = `Passage à 1 mètre sur ${name} ${formatDateForSpeech(samplingDate)}`;
                 }
                 voiceAnnouncements.push(voiceMsg);
 
@@ -751,7 +751,7 @@
                      cumulativeTimeMins += timeToStopMins;
                      let stopDate = addMinutes(now, cumulativeTimeMins);
 
-                     voiceAnnouncements.push(`Arrêt déplacement ${formatDateForSpeech(stopDate)}`);
+                     voiceAnnouncements.push(`Arrêt déplacement sur ${name} ${formatDateForSpeech(stopDate)}`);
 
                      // Add Shift Duration
                      cumulativeTimeMins += shiftDuration;
@@ -790,6 +790,11 @@
                     </div>
                 `;
             }
+
+            // Add announcement for end of product
+            if (rem > 0) {
+                 voiceAnnouncements.push(`Fin du chargement de ${name} ${formatDateForSpeech(pEndDate)}`);
+            }
         });
 
         productScheduleHtml += `</div>`;
@@ -807,7 +812,7 @@
         if (voiceAnnouncements.length > 0) {
             finalVoiceMsg += voiceAnnouncements.join(". ") + ". ";
         }
-        finalVoiceMsg += `Le chargement se terminera ${formatDateForSpeech(endDate)}.`;
+        finalVoiceMsg += `Le chargement total se terminera ${formatDateForSpeech(endDate)}.`;
 
         speakAnnouncement(finalVoiceMsg);
 
@@ -882,6 +887,7 @@
         let now = startTimeVal ? new Date(startTimeVal) : new Date();
 
         let extraHtml = "";
+        let voiceAnnouncements = [];
 
         // Shore Tanks Schedule with Slow Start Logic
         const tankRows = document.querySelectorAll('.shore-tank-row');
@@ -1051,6 +1057,10 @@
 
                     let tankEndTime = addMinutes(now, totalDurationMins);
 
+                    if (remainingInTank <= 0) {
+                         voiceAnnouncements.push(`Fin du réservoir ${name} ${formatDateForSpeech(tankEndTime)}`);
+                    }
+
                     extraHtml += `
                         <div style="margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px; ${tankClass}">
                             <div style="display:flex; justify-content:space-between; font-size:1em;">
@@ -1104,7 +1114,14 @@
         let m = Math.round(totalDurationMins % 60);
         let finalEndDate = addMinutes(now, totalDurationMins);
 
-        speakAnnouncement(`Le déchargement se terminera ${formatDateForSpeech(finalEndDate)}.`);
+        // Construct final voice message
+        let finalVoiceMsg = "";
+        if (voiceAnnouncements.length > 0) {
+            finalVoiceMsg += voiceAnnouncements.join(". ") + ". ";
+        }
+        finalVoiceMsg += `Le déchargement se terminera ${formatDateForSpeech(finalEndDate)}.`;
+
+        speakAnnouncement(finalVoiceMsg);
 
         document.getElementById('unloadDone').innerText = discharged.toFixed(1);
         document.getElementById('unloadRemaining').innerText = current.toFixed(1);
