@@ -998,70 +998,74 @@
 
                         let volDone = filledAlready; // The volume we have already traversed in the phases
 
-                        // --- Phase 1: Slow Start ---
+                        // --- Define Phases (Start -> Normal -> Slow End) ---
+
+                        // 1. Slow Phase (Stripping/End) - Reserved from END of tank
+                        let phaseSlowVol = 0;
+                        let phaseSlowRate = slowRateInput;
+                        let phaseSlowDur = slowDurInput;
+                        if (useSlowdown) {
+                            let req = phaseSlowRate * (phaseSlowDur / 60);
+                            phaseSlowVol = Math.min(req, qty); // Cap at total tank size
+                        }
+
+                        // 2. Start Phase (Beginning)
+                        let phaseStartVol = 0;
+                        let phaseStartRate = (rate > 3000) ? 3000 : rate;
+                        let phaseStartDur = 30;
                         let bypassCheck = row.querySelector('.tank-bypass-check');
                         let isBypass = (index === 0 && bypassCheck && bypassCheck.checked);
-                        let phase1Vol = 0;
-                        let phase1Rate = 0;
-                        let phase1Dur = 0;
 
-                        if (!isBypass) {
-                            phase1Dur = 30;
-                            phase1Rate = (rate > 3000) ? 3000 : rate;
-                            phase1Vol = phase1Rate * (phase1Dur / 60);
+                        // Capacity available for Start/Normal phases (Total - Slow End)
+                        let capacityForOthers = qty - phaseSlowVol;
+                        if (capacityForOthers < 0) capacityForOthers = 0;
+
+                        if (!isBypass && capacityForOthers > 0) {
+                             let req = phaseStartRate * (phaseStartDur / 60);
+                             phaseStartVol = Math.min(req, capacityForOthers);
                         }
 
-                        // Process Phase 1
-                        if (phase1Vol > 0) {
-                             if (volDone >= phase1Vol) {
-                                 // Phase 1 fully done
-                                 volDone -= phase1Vol;
-                                 msgs.push(`<div class="text-muted" style="font-size:0.85em; margin-left:10px;">➜ Démarrage (Terminé)</div>`);
-                             } else {
-                                 // Phase 1 partially or not done
-                                 let effectivePhase1Vol = Math.min(phase1Vol, qty); // Cap phase 1 by total tank size
-                                 let workLeftInPhase1 = effectivePhase1Vol - volDone;
+                        // 3. Normal Phase (Middle)
+                        let phaseNormalVol = capacityForOthers - phaseStartVol;
+                        let phaseNormalRate = rate;
 
-                                 // If workLeftInPhase1 > remainingInTank, clamp it.
-                                 if (workLeftInPhase1 > remainingInTank) workLeftInPhase1 = remainingInTank;
+                        // Phase Execution Sequence
+                        let phases = [
+                            { name: "Démarrage", vol: phaseStartVol, rate: phaseStartRate, isSlow: false },
+                            { name: "Normal", vol: phaseNormalVol, rate: phaseNormalRate, isSlow: false },
+                            { name: "Ralenti (Fin)", vol: phaseSlowVol, rate: phaseSlowRate, isSlow: true }
+                        ];
 
-                                 if (workLeftInPhase1 > 0) {
-                                     let time = (workLeftInPhase1 / phase1Rate) * 60;
-                                     tankDurationMins += time;
-                                     remainingInTank -= workLeftInPhase1;
-                                     msgs.push(`<div class="text-muted" style="font-size:0.85em; margin-left:10px;">➜ Démarrage (Reste) : ${time.toFixed(1)}m @ ${phase1Rate.toFixed(0)}</div>`);
-                                 }
+                        phases.forEach(p => {
+                            if (p.vol <= 0) return;
 
-                                 // We have consumed the 'volDone' for Phase 1 context.
-                                 volDone = 0;
-                             }
-                        }
-
-                        // --- Phase 2: Manual Slowdown ---
-                        if (remainingInTank > 0 && useSlowdown) {
-                            let phase2Vol = slowRateInput * (slowDurInput / 60);
-
-                            if (volDone >= phase2Vol) {
-                                // Phase 2 fully done
-                                volDone -= phase2Vol;
-                                msgs.push(`<div class="text-muted" style="font-size:0.85em; margin-left:10px;">➜ Ralenti (Terminé)</div>`);
-                            } else {
-                                // We are in Phase 2 or at start of it
-                                let workLeftInPhase2 = phase2Vol - volDone;
-                                if (workLeftInPhase2 > remainingInTank) workLeftInPhase2 = remainingInTank;
-
-                                if (workLeftInPhase2 > 0) {
-                                    let time = (workLeftInPhase2 / slowRateInput) * 60;
-                                    tankDurationMins += time;
-                                    remainingInTank -= workLeftInPhase2;
-                                     msgs.push(`<div class="text-orange" style="font-size:0.85em; margin-left:10px;">➜ Ralenti (Reste) : ${time.toFixed(1)}m @ ${slowRateInput}</div>`);
+                            if (volDone >= p.vol) {
+                                // This phase is fully in the past (already pumped)
+                                volDone -= p.vol;
+                                if (p.name !== "Normal") { // Hide Normal completion to reduce clutter
+                                    msgs.push(`<div class="text-muted" style="font-size:0.85em; margin-left:10px; text-decoration:line-through;">➜ ${p.name} (Terminé)</div>`);
                                 }
-                                volDone = 0;
-                            }
-                        }
+                            } else {
+                                // This phase is active or future
+                                let workLeft = p.vol - volDone;
+                                volDone = 0; // We have consumed the offset
 
-                        // --- Phase 3: Normal ---
-                        if (remainingInTank > 0) {
+                                // Safety: clamp to actual remaining pumpable volume
+                                if (workLeft > remainingInTank) workLeft = remainingInTank;
+
+                                if (workLeft > 0.001) {
+                                    let time = (workLeft / p.rate) * 60;
+                                    tankDurationMins += time;
+                                    remainingInTank -= workLeft;
+
+                                    let msgClass = p.isSlow ? "text-orange" : "text-muted";
+                                    msgs.push(`<div class="${msgClass}" style="font-size:0.85em; margin-left:10px;">➜ ${p.name} (Reste) : ${time.toFixed(1)}m @ ${p.rate.toFixed(0)}</div>`);
+                                }
+                            }
+                        });
+
+                        // Fallback for any rounding errors or if Normal phase needs to pick up slack
+                        if (remainingInTank > 0.01) {
                              let time = (remainingInTank / rate) * 60;
                              tankDurationMins += time;
                              remainingInTank = 0;
